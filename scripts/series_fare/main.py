@@ -50,6 +50,37 @@ DEFAULT_FULL_NAME = "Yeti@BLRC498"
 DEFAULT_CLIENT_ID = "TBOINDIA"
 DEFAULT_PRODUCT_TYPE = "CAR"
 DEFAULT_SESSION_FILE = ".tbo_api_session.json"
+# TBO EndUserIp (must match the network used for OTP / TokenId).
+DEFAULT_END_USER_IP = "2400:1a00:3b49:cbd2:98fd:178e:e114:9141"
+# Akamai bot cookie from a working Chrome capture — refresh when 307 /ErrorPage returns.
+DEFAULT_AK_BMSC = (
+    "BB7B769A41D8A331A5B18F2E1295A57F~000000000000000000000000000000~"
+    "YAAQdvEBF9nW9aefAQAAZtZ44ADLdpg2nn/xGKcW1J+gFgc/z5Z1GlR5C5r+tbYyQFsq4dgVeLo1"
+    "CG6pAE6o2I4d8mLTddbKtHyIrYuFf0UCT8C2+Q25DpZHcVby2nDT/uz6bHok+sCClGS4flv9bqSO"
+    "KozabI7wUFBEWgwGmoQ12bTisCyskQYl/V+Fo81/YnCdciK1BLvA4NVPntWdOGn9k9QjtbCRJrWm"
+    "CapBm1IHKWjVOqe2w0xtVb22ooRMrn13VAvGgWwVq5KQkbgX8r+QUw28we60fGw/EyvwMQ+xw/Xg"
+    "KkqeGpcM3FX2EFqkeYO49f3Nxg3/CvSj42r1ZnU00UiDUQ/WG8ttlLxXwKPtmKl1mVBrr111ngwl"
+    "MwB8KoI9nQxr08vJEZL2bgNz3SHQqzMSnT6jyfrsDyM4UKelgTA+1ayoUxa6r/znxkt8eg9R40og"
+    "QfWmya3T4Cniih0kKQpsJRPf6VmAVcY7y2GXBKs="
+)
+DEFAULT_AJS_USER_ID = "TBOI-156197"
+DEFAULT_AJS_ANON_ID = "7645962f-7371-4108-b286-bd52fbd363f7"
+
+
+def ipv4_to_tbo_end_user_ip(ipv4: str) -> str:
+    """Convert IPv4 → full 8-hextet IPv4-mapped IPv6 (TBO EndUserIp style).
+
+    Example: 27.34.66.111 → 0000:0000:0000:0000:0000:ffff:1b22:426f
+    """
+    parts = (ipv4 or "").strip().split(".")
+    if len(parts) != 4:
+        raise ValueError(f"not an IPv4 address: {ipv4!r}")
+    octets = [int(p) for p in parts]
+    if any(o < 0 or o > 255 for o in octets):
+        raise ValueError(f"not an IPv4 address: {ipv4!r}")
+    hi = (octets[0] << 8) | octets[1]
+    lo = (octets[2] << 8) | octets[3]
+    return f"0000:0000:0000:0000:0000:ffff:{hi:04x}:{lo:04x}"
 
 DEFAULT_FARE_RULE = (
     "This is a Series Fare booking and is Non-Refundable and Non-Changeable. "
@@ -80,7 +111,7 @@ class Config:
     agency_id: str = DEFAULT_AGENCY_ID
     member_id: str = DEFAULT_MEMBER_ID
     full_name: str = DEFAULT_FULL_NAME
-    end_user_ip: str = ""
+    end_user_ip: str = DEFAULT_END_USER_IP
     add_url: str = ADD_SERIES_FARE_URL
     session_file: str = DEFAULT_SESSION_FILE
     airline_code: str = "YT"
@@ -320,19 +351,32 @@ def detect_public_ip() -> str:
     return ""
 
 
+def normalize_end_user_ip(value: str) -> str:
+    """IPv4 → TBO 8-hextet form; leave native IPv6 as-is."""
+    text = (value or "").strip()
+    if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", text):
+        return ipv4_to_tbo_end_user_ip(text)
+    return text
+
+
 def resolve_end_user_ip(configured: str) -> str:
-    """Use form/CLI override when set; otherwise detect this machine's public IP."""
+    """Use configured IP, script default, or auto-detect as a last resort."""
     manual = (configured or "").strip()
-    if manual and manual not in ("127.0.0.1", "0.0.0.0", "auto", "detect"):
-        print(f"EndUserIp: {manual} (from form)")
-        return manual
-    print("EndUserIp: detecting public IP…")
-    ip = detect_public_ip()
-    if ip:
-        print(f"EndUserIp: {ip}")
-        return ip
-    print("  WARNING: could not detect public IP — using 127.0.0.1")
-    return "127.0.0.1"
+    if manual in ("auto", "detect"):
+        print("EndUserIp: detecting public IP…")
+        ip = detect_public_ip()
+        if ip:
+            out = normalize_end_user_ip(ip)
+            print(f"EndUserIp: {out}")
+            return out
+        print(f"  WARNING: detect failed — using {DEFAULT_END_USER_IP}")
+        return DEFAULT_END_USER_IP
+    if manual and manual not in ("127.0.0.1", "0.0.0.0"):
+        out = normalize_end_user_ip(manual)
+        print(f"EndUserIp: {out}")
+        return out
+    print(f"EndUserIp: {DEFAULT_END_USER_IP} (script default)")
+    return DEFAULT_END_USER_IP
 
 
 def dig(obj: Any, *names: str) -> Any:
@@ -744,7 +788,7 @@ def build_payload(rec: InventoryRecord, cfg: Config,
 
     return {
         "AgencyId": str(agency),
-        "EndUserIp": cfg.end_user_ip or "127.0.0.1",
+        "EndUserIp": cfg.end_user_ip or DEFAULT_END_USER_IP,
         "TokenId": token,
         # Working capture often has TraceId as "".
         "TraceId": trace if trace is not None else (cfg.trace_id or ""),
@@ -793,7 +837,7 @@ def parse_cookie_header(raw: str) -> dict[str, str]:
 
 def build_cookie_header(token: str, agency: str, member: str, end_user_ip: str,
                         *, full_name: str = DEFAULT_FULL_NAME) -> str:
-    """Build the Cookie header in Python (not from the Helix form)."""
+    """Build Cookie to match a working Chrome addSeriesFare capture."""
     ip = (end_user_ip or "").strip()
     jar = {
         "agencyId": agency,
@@ -802,26 +846,31 @@ def build_cookie_header(token: str, agency: str, member: str, end_user_ip: str,
         "tokenAgencyId": agency,
         "tokenMemberId": member,
         "accountCode": account_code_for(agency),
+        "IPAddress": "",
         "ProductType": DEFAULT_PRODUCT_TYPE,
         "clientID": DEFAULT_CLIENT_ID,
         "FullName": urlparse.quote((full_name or DEFAULT_FULL_NAME).strip(),
                                    safe=""),
+        "ak_bmsc": DEFAULT_AK_BMSC,
         "clientIP": urlparse.quote(ip, safe="") if ip else "",
+        "ajs_user_id": DEFAULT_AJS_USER_ID,
+        "ajs_anonymous_id": DEFAULT_AJS_ANON_ID,
     }
     if token:
         jar["pTokenId"] = token
+    # Order close to the working DevTools capture (auth + Akamai first).
     order = [
         "agencyId", "memberId", "tokenId", "tokenAgencyId", "tokenMemberId",
-        "accountCode", "ProductType", "clientID", "FullName", "clientIP",
-        "pTokenId",
+        "accountCode", "IPAddress", "ProductType", "clientID", "FullName",
+        "ak_bmsc", "clientIP", "ajs_user_id", "ajs_anonymous_id", "pTokenId",
     ]
-    return "; ".join(f"{k}={jar[k]}" for k in order if k in jar)
+    return "; ".join(f"{k}={jar[k]}" for k in order if k in jar and jar[k] is not None)
 
 
 def tbo_browser_headers(token: str, agency: str, member: str,
                         end_user_ip: str,
                         *, full_name: str = DEFAULT_FULL_NAME) -> dict[str, str]:
-    """HTTP headers for addSeriesFare — always constructed in this file."""
+    """HTTP headers for addSeriesFare — mirror working Chrome request."""
     return {
         "Accept": "*/*",
         "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
@@ -829,6 +878,13 @@ def tbo_browser_headers(token: str, agency: str, member: str,
         "Origin": SERIES_FARE_ORIGIN,
         "Referer": f"{SERIES_FARE_ORIGIN}/",
         "User-Agent": BROWSER_UA,
+        "sec-ch-ua":
+            '"Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
         "Cookie": build_cookie_header(
             token, agency, member, end_user_ip, full_name=full_name,
         ),
@@ -1097,8 +1153,8 @@ def parse_args() -> Config:
     p.add_argument("--member-id",
                    default=os.environ.get("TBO_MEMBER_ID", DEFAULT_MEMBER_ID))
     p.add_argument("--full-name", default=DEFAULT_FULL_NAME)
-    p.add_argument("--end-user-ip", default="",
-                   help="Override EndUserIp; leave empty to auto-detect public IP")
+    p.add_argument("--end-user-ip", default=DEFAULT_END_USER_IP,
+                   help="EndUserIp / Cookie clientIP (default: script constant)")
     p.add_argument("--add-url", default=ADD_SERIES_FARE_URL)
     # Ignored legacy flags (old Helix forms / CheckMFA / cookie paste)
     p.add_argument("--cookie", default="")
@@ -1155,7 +1211,7 @@ def parse_args() -> Config:
         agency_id=args.agency_id.strip() or DEFAULT_AGENCY_ID,
         member_id=args.member_id.strip() or DEFAULT_MEMBER_ID,
         full_name=args.full_name.strip() or DEFAULT_FULL_NAME,
-        end_user_ip=args.end_user_ip.strip(),
+        end_user_ip=args.end_user_ip.strip() or DEFAULT_END_USER_IP,
         add_url=args.add_url.strip() or ADD_SERIES_FARE_URL,
         session_file=args.session_file.strip() or DEFAULT_SESSION_FILE,
         airline_code=(args.airline_code or args.airline or "YT").strip() or "YT",
