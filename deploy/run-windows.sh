@@ -8,7 +8,7 @@
 #
 # Requirements:
 #   - Windows (Git Bash recommended)
-#   - Python 3.14 via the Windows launcher:  py -3.14 --version
+#   - Python 3.12 via the Windows launcher:  py -3.12 --version
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT}"
 
-PY_VER="3.14"
+PY_VER="3.12"
 VENV_DIR="${ROOT}/.venv"
 VENV_PY="${VENV_DIR}/Scripts/python.exe"
 FRESH=0
@@ -54,15 +54,15 @@ is_windows_host() {
 
 is_windows_host || die "This script is for Windows only (run under Git Bash on Windows)."
 
-# --- Resolve Python 3.14 (Windows py launcher preferred) ---
+# --- Resolve Python 3.12 (Windows py launcher preferred) ---
 resolve_python314() {
   if command -v py >/dev/null 2>&1; then
-    if py -3.14 -c "import sys; assert sys.version_info[:2]==(3,14)" >/dev/null 2>&1; then
-      echo "py -3.14"
+    if py -3.12 -c "import sys; assert sys.version_info[:2]==(3,14)" >/dev/null 2>&1; then
+      echo "py -3.12"
       return 0
     fi
   fi
-  for cand in python3.14 python314 python; do
+  for cand in python3.12 python314 python; do
     if command -v "${cand}" >/dev/null 2>&1; then
       if "${cand}" -c "import sys; raise SystemExit(0 if sys.version_info[:2]==(3,14) else 1)" >/dev/null 2>&1; then
         echo "${cand}"
@@ -73,13 +73,13 @@ resolve_python314() {
   return 1
 }
 
-# Run a command that may be "py -3.14" (two tokens) or a single binary
+# Run a command that may be "py -3.12" (two tokens) or a single binary
 run_py() {
   # shellcheck disable=SC2086
   local launcher="$1"
   shift
-  if [[ "${launcher}" == "py -3.14" ]]; then
-    py -3.14 "$@"
+  if [[ "${launcher}" == "py -3.12" ]]; then
+    py -3.12 "$@"
   else
     "${launcher}" "$@"
   fi
@@ -124,8 +124,8 @@ elif venv_is_windows; then
   log "Keeping existing Windows .venv"
 fi
 
-# --- 3) Create Windows .venv with Python 3.14 ---
-PY314="$(resolve_python314)" || die "Python ${PY_VER} not found. Install it, then verify:  py -3.14 --version"
+# --- 3) Create Windows .venv with Python 3.12 ---
+PY314="$(resolve_python314)" || die "Python ${PY_VER} not found. Install it, then verify:  py -3.12 --version"
 log "Using interpreter: ${PY314}"
 run_py "${PY314}" -c "import sys; print(sys.version)"
 
@@ -145,7 +145,7 @@ else
 fi
 
 log "Venv Python: ${PY}"
-"${PY}" -c "import sys; print(sys.executable); print(sys.version); assert sys.version_info[:2]==(3,14), 'venv is not Python 3.14'"
+"${PY}" -c "import sys; print(sys.executable); print(sys.version); assert sys.version_info[:2]==(3,14), 'venv is not Python 3.12'"
 
 # --- 4) Point Helix jobs at Windows venv python ---
 # Use forward slashes only — JSON treats "\S" as an invalid escape and
@@ -186,7 +186,7 @@ log "Upgrading pip / wheel"
 
 log "Installing requirements.txt"
 if ! "${PY}" -m pip install -r "${ROOT}/requirements.txt"; then
-  warn "Full requirements install failed (common on 3.14 for PaddleOCR wheels)."
+  warn "Full requirements install failed (common on 3.12 for PaddleOCR wheels)."
   warn "Installing core Helix web deps so the app can still start…"
   "${PY}" -m pip install "flask>=3.0.0" "jinja2>=3.1.0" "jsonschema>=4.22.0" \
     || die "Could not install core dependencies."

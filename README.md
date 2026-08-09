@@ -47,7 +47,7 @@ Create a **new** venv on the Windows machine — do not copy `.venv` from a Mac/
 
 ```powershell
 cd C:\path\to\automation-hub
-py -3 -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python -m playwright install chromium

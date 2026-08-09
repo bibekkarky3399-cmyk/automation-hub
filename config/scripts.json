@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "python": ".venv/bin/python3",
+  "python": ".venv/Scripts/python.exe",
   "output_dir": "outputs",
   "runtime": {
     "max_concurrent_jobs": 1,
