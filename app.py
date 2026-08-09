@@ -321,7 +321,13 @@ def api_flights_sectors():
     except BookingClientError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
-        return jsonify({"ok": False, "error": f"Could not load cities: {exc}"}), 500
+        msg = str(exc)
+        if "escape" in msg.lower() or "scripts.json" in msg.lower():
+            msg = (
+                f"{msg} — fix config/scripts.json python path to "
+                '".venv/Scripts/python.exe" (forward slashes), then restart Helix.'
+            )
+        return jsonify({"ok": False, "error": f"Could not load cities: {msg}"}), 500
 
 
 @app.post("/api/flights/search")

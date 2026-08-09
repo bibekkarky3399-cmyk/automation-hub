@@ -39,7 +39,72 @@ PORTAL_URL = "https://res.yetiairlines.com/b2b/User.aspx"
 #   BDP BHADRAPUR | BWA BHAIRAHAWA | BIR BIRATNAGAR | JKR JANAKPUR
 #   KTM KATHMANDU | KEP NEPALGUNJ  | PKR POKHARA     | TPU TIKAPUR (dest only)
 
-PNR_RE = re.compile(r"\bPNR\s*[:#]?\s*([A-Z0-9]{5,8})\b", re.IGNORECASE)
+# Yeti B2B confirmation shows the locator as:
+#   Booking Details:        A6MYBA
+# (class BookingRefItenerary > span.right) — it does NOT say "PNR".
+PNR_RE_LIST = [
+    # Primary Yeti B2B format (from live confirmation dumps)
+    re.compile(
+        r"Booking\s*Details\s*:\s*([A-Z0-9]{5,8})\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bPNR\s*(?:No\.?|Number|#|NO)?\s*[:.\-]?\s*([A-Z0-9]{5,8})\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:Booking\s*(?:Ref(?:erence)?|Code|Id|ID)|Record\s*Locator|File\s*Key|"
+        r"Reservation\s*(?:No\.?|Number|Code))\s*[:.\-]?\s*([A-Z0-9]{5,8})\b",
+        re.IGNORECASE,
+    ),
+    # Label and value separated by other punctuation / newlines
+    re.compile(
+        r"\bPNR\b[^\nA-Z0-9]{0,80}([A-Z0-9]{5,8})\b",
+        re.IGNORECASE,
+    ),
+    # HTML: <span class="right">A6MYBA</span> after Booking Details
+    re.compile(
+        r'Booking\s*Details\s*:?\s*</span>\s*<span[^>]*class="[^"]*right[^"]*"[^>]*>\s*([A-Z0-9]{5,8})\s*<',
+        re.IGNORECASE,
+    ),
+    # HTML attribute / hidden field style
+    re.compile(
+        r"""(?:pnr|bookingref|recordlocator)\s*[=:]\s*['"]?([A-Z0-9]{5,8})\b""",
+        re.IGNORECASE,
+    ),
+]
+# Words that look like codes but are not PNRs on the portal chrome.
+PNR_FALSE_POSITIVES = frozenset(
+    {
+        "PLEASE",
+        "NUMBER",
+        "DETAILS",
+        "FLIGHT",
+        "BOOKING",
+        "PAYLATER",
+        "CONFIRMED",
+        "AIRLINES",
+        "GROUP",
+        "ADULTS",
+        "SECTOR",
+        "KATHMANDU",
+        "BIRATNAG",
+        "POKHARA",
+        "SEARCH",
+        "SUBMIT",
+        "SELECT",
+        "BUTTON",
+        "ONLINE",
+        "STATUS",
+        "PAYMENT",
+        "LATER",
+        "WITHIN",
+        "CHANGE",
+        "PERSON",
+        "MOBILE",
+        "PASSEN",
+    }
+)
 
 
 @dataclass
@@ -237,6 +302,18 @@ async def search_flights(page, origin: str, dest: str, day: str, year_month: str
         return False
 
 
+def normalize_flight_number(value: str) -> str:
+    """'YT781', 'yt 781', '781' → '781'."""
+    text = (value or "").strip().upper()
+    text = re.sub(r"^YT\s*", "", text)
+    m = re.search(r"(\d{3,4})", text)
+    return m.group(1) if m else text
+
+
+def normalize_fare_code(value: str) -> str:
+    return (value or "").strip().upper()
+
+
 async def select_flight(page) -> bool:
     assert CFG is not None
     try:
@@ -246,29 +323,78 @@ async def select_flight(page) -> bool:
         print(f"  ❌ Results table not found: {e}")
         return False
 
+    # Yeti repeats fare classes under one flight; only the first row shows "YT 673".
+    # Later rows leave the flight cell empty (rowspan) — carry the last flight number.
     rows = await page.evaluate(
         r"""
         () => {
             const results = [];
+            let lastFlight = '';
             document.querySelectorAll('#tabOutward tr').forEach(row => {
                 const radio = row.querySelector('input[name="Rad_Out"]');
                 if (!radio) return;
                 const tds = row.querySelectorAll('td');
-                if (tds.length < 9) return;
-                const flightCell = tds[0] ? tds[0].textContent.trim() : '';
-                const fareCell   = tds[6] ? tds[6].textContent.trim() : '';
-                const seatCell   = tds[7] ? tds[7].textContent.trim() : '';
-                const priceCell  = tds[8] ? tds[8].textContent.trim() : '';
+                if (tds.length < 7) return;
+
+                // Column layout can shift slightly; prefer heuristics over fixed indexes.
+                const cells = Array.from(tds).map(td => (td.textContent || '').trim());
+                const flightCell = cells[0] || '';
                 let flightNumber = '';
-                const m = flightCell.match(/YT\s*(\d{3})/);
-                if (m) flightNumber = m[1];
+                const fm = flightCell.match(/YT\s*(\d{3,4})/i) || flightCell.match(/\b(\d{3,4})\b/);
+                if (fm) {
+                    flightNumber = fm[1];
+                    lastFlight = flightNumber;
+                } else if (lastFlight) {
+                    flightNumber = lastFlight;
+                } else {
+                    // Sometimes the radio value embeds the flight number.
+                    const rm = String(radio.value || '').match(/(?:YT)?(\d{3,4})/i);
+                    if (rm) {
+                        flightNumber = rm[1];
+                        lastFlight = flightNumber;
+                    }
+                }
+
+                // Fare class is usually a short code (F, G, Y, N, E1, …).
+                let fareCode = '';
+                let fareIdx = -1;
+                for (let i = 0; i < cells.length; i++) {
+                    const c = cells[i];
+                    if (/^[A-Z][A-Z0-9]{0,2}$/i.test(c) && !/^(YT|NPR|USD)$/i.test(c)) {
+                        fareCode = c.toUpperCase();
+                        fareIdx = i;
+                        // Prefer a class near the end of the row (before seats/price).
+                        if (i >= Math.max(0, cells.length - 5)) break;
+                    }
+                }
+                if (!fareCode && cells[6]) fareCode = cells[6].toUpperCase();
+
+                let seatCell = '';
+                let priceCell = '';
+                if (fareIdx >= 0) {
+                    seatCell = cells[fareIdx + 1] || '';
+                    priceCell = cells[fareIdx + 2] || cells[cells.length - 1] || '';
+                } else {
+                    seatCell = cells[7] || '';
+                    priceCell = cells[8] || cells[cells.length - 1] || '';
+                }
+
                 let price = 0;
-                if (priceCell) price = parseFloat(priceCell.replace(/,/g, '')) || 0;
+                const pm = (priceCell || '').replace(/,/g, '').match(/(\d+(?:\.\d+)?)/);
+                if (pm) price = parseFloat(pm[1]) || 0;
                 let seats = 0;
-                const sm = seatCell.match(/(\d+)/);
+                const sm = (seatCell || '').match(/(\d+)/);
                 if (sm) seats = parseInt(sm[1], 10);
-                results.push({ radioValue: radio.value, flightNumber, fareCode: fareCell,
-                               price, priceStr: priceCell, seats });
+
+                results.push({
+                    radioValue: radio.value,
+                    flightNumber,
+                    fareCode,
+                    price,
+                    priceStr: priceCell || String(price),
+                    seats,
+                    flightCell,
+                });
             });
             return results;
         }
@@ -279,19 +405,44 @@ async def select_flight(page) -> bool:
         print("  ❌ No fare rows found")
         return False
 
+    want_flight = normalize_flight_number(CFG.flight_number)
+    want_fare = normalize_fare_code(CFG.fare_code)
+
     matches = [
         r
         for r in rows
-        if r["flightNumber"] == CFG.flight_number and r["fareCode"] == CFG.fare_code
+        if normalize_flight_number(r.get("flightNumber") or "") == want_flight
+        and normalize_fare_code(r.get("fareCode") or "") == want_fare
     ]
     if not matches:
+        by_flight: dict[str, list[str]] = {}
+        for r in rows:
+            fn = normalize_flight_number(r.get("flightNumber") or "") or "?"
+            fc = normalize_fare_code(r.get("fareCode") or "") or "?"
+            by_flight.setdefault(fn, [])
+            if fc not in by_flight[fn]:
+                by_flight[fn].append(fc)
+
         print(
-            f"  ❌ No row matches Flight {CFG.flight_number} / Fare {CFG.fare_code}. Available:"
+            f"  ❌ No row matches Flight {want_flight} / Fare {want_fare}. Available:"
         )
         for r in rows:
+            fn = normalize_flight_number(r.get("flightNumber") or "") or "????"
             print(
-                f"     - YT {r['flightNumber'] or '???':<4} {r['fareCode']:<4} "
-                f"NPR {r['priceStr']:<12} seats={r['seats']}"
+                f"     - YT {fn:<4} {normalize_fare_code(r.get('fareCode') or ''):<4} "
+                f"NPR {str(r.get('priceStr') or ''):<12} seats={r.get('seats')}"
+            )
+
+        if want_flight in by_flight:
+            print(
+                f"  💡 Flight YT{want_flight} is listed, but fare {want_fare} is not. "
+                f"Fares on that flight: {', '.join(by_flight[want_flight])}"
+            )
+        else:
+            listed = ", ".join(f"YT{f}" for f in sorted(by_flight) if f != "?")
+            print(
+                f"  💡 Flight YT{want_flight} is not on this date/sector. "
+                f"Flights seen: {listed or '(none)'}"
             )
         return False
 
@@ -379,13 +530,224 @@ async def read_page_state(page) -> dict:
     )
 
 
+def _looks_like_pnr(code: str) -> bool:
+    value = (code or "").strip().upper()
+    if len(value) < 5 or len(value) > 8:
+        return False
+    if value in PNR_FALSE_POSITIVES:
+        return False
+    # Yeti PNRs are alphanumeric; reject pure digits / dates.
+    if value.isdigit():
+        return False
+    if not re.fullmatch(r"[A-Z0-9]{5,8}", value):
+        return False
+    return True
+
+
 def extract_pnr(text: str) -> str:
-    match = PNR_RE.search(text or "")
-    return match.group(1).upper() if match else ""
+    """Pull a PNR / booking reference from confirmation page text."""
+    blob = text or ""
+    for pattern in PNR_RE_LIST:
+        for match in pattern.finditer(blob):
+            candidate = match.group(1).upper()
+            if _looks_like_pnr(candidate):
+                return candidate
+    return ""
 
 
-async def advance_through_booking(page, max_steps: int = 10) -> tuple[bool, str]:
-    """Return (ok, pnr_or_empty)."""
+def looks_like_final_confirmation(heading: str, body: str) -> bool:
+    """Strong signals that a booking was issued (PNR should be on this page)."""
+    text = body or ""
+    head = heading or ""
+    return bool(
+        "Please pay within" in text
+        or re.search(r"\bPNR\s*(?:No\.?|Number|NO)\b", text, re.I)
+        or re.search(r"\bBooking\s+(?:Confirmed|Confirmation)\b", text, re.I)
+        or ("Confirmed" in text and re.search(r"\bPNR\b", text, re.I))
+        or re.search(r"pay within\s+\d+", text, re.I)
+        or ("confirmation" in head.lower() and "booking" in text.lower())
+    )
+
+
+def looks_like_review_page(heading: str, body: str) -> bool:
+    """Intermediate review pages often say 'Booking Details' before a PNR exists."""
+    text = body or ""
+    head = heading or ""
+    if looks_like_final_confirmation(head, text):
+        return False
+    return bool(
+        "Booking Details" in text
+        or "Booking Detail" in text
+        or "Review" in head
+        or "Summary" in head
+    )
+
+
+async def scrape_pnr_from_dom(page) -> str:
+    """Find PNR from labeled cells, inputs, HTML, URL, and iframes."""
+    try:
+        found = await page.evaluate(
+            """
+            () => {
+              const out = [];
+              const push = (s) => {
+                const t = (s || '').replace(/\\s+/g, ' ').trim();
+                if (t) out.push(t);
+              };
+              push(location.href);
+              // Yeti B2B: <div class="BookingRefItenerary"><span class="right">A6MYBA</span>
+              for (const el of document.querySelectorAll(
+                '.BookingRefItenerary .right, .BookingRefItenerary span.right, #BookingRefItenerary .right'
+              )) {
+                push('Booking Details: ' + (el.textContent || ''));
+                push((el.textContent || '').trim());
+              }
+              // Whole rows that mention PNR / booking details
+              for (const row of document.querySelectorAll('tr, .BookingRefItenerary, div')) {
+                const t = (row.innerText || '').trim();
+                if (t.length > 200) continue;
+                if (/\\bPNR\\b/i.test(t) || /booking\\s*details/i.test(t) || /booking\\s*ref/i.test(t)) {
+                  push(t);
+                }
+              }
+              // Label → value pairs
+              for (const el of document.querySelectorAll(
+                'td, th, span, div, label, b, strong, font, li, p'
+              )) {
+                const t = (el.textContent || '').trim();
+                if (!t || t.length > 120) continue;
+                if (!/PNR/i.test(t) && !/booking\\s*ref/i.test(t) && !/record\\s*locator/i.test(t)) {
+                  continue;
+                }
+                push(t);
+                const row = el.closest('tr');
+                if (row) push(row.innerText);
+                let sib = el.nextElementSibling;
+                if (sib) push(sib.textContent);
+                const parent = el.parentElement;
+                if (parent) push(parent.innerText);
+              }
+              // Inputs / hidden fields
+              for (const el of document.querySelectorAll('input, textarea, select')) {
+                const id = (el.id || '').toLowerCase();
+                const name = (el.name || '').toLowerCase();
+                const cls = (typeof el.className === 'string' ? el.className : '').toLowerCase();
+                const val = el.value != null ? String(el.value) : '';
+                if (id.includes('pnr') || name.includes('pnr') || cls.includes('pnr') ||
+                    id.includes('booking') || name.includes('recordlocator')) {
+                  push(id + '=' + val);
+                  push(name + '=' + val);
+                  push(val);
+                }
+                if (/^[A-Za-z0-9]{5,8}$/.test(val.trim()) &&
+                    (id.includes('pnr') || name.includes('pnr'))) {
+                  push(val.trim());
+                }
+              }
+              // id/class hints
+              for (const el of document.querySelectorAll('[id], [class]')) {
+                const id = (el.id || '').toLowerCase();
+                const cls = (typeof el.className === 'string' ? el.className : '').toLowerCase();
+                if (!id.includes('pnr') && !cls.includes('pnr') &&
+                    !id.includes('recordlocator') && !cls.includes('recordlocator')) {
+                  continue;
+                }
+                push(el.textContent);
+                if (el.value) push(String(el.value));
+              }
+              // Raw HTML snippets around PNR (catches values not in innerText)
+              const html = document.documentElement ? document.documentElement.innerHTML : '';
+              const re = /PNR[^<{]{0,80}[A-Z0-9]{5,8}/gi;
+              let m;
+              let n = 0;
+              while ((m = re.exec(html)) && n < 10) {
+                push(m[0].replace(/<[^>]+>/g, ' '));
+                n += 1;
+              }
+              return out.slice(0, 80);
+            }
+            """
+        )
+    except Exception as exc:
+        print(f"    ⚠️ DOM PNR scrape failed: {exc}")
+        found = []
+
+    chunks = list(found or [])
+    # Also scan same-origin iframes
+    try:
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            try:
+                text = await frame.evaluate("() => document.body ? document.body.innerText : ''")
+                if text:
+                    chunks.append(text[:4000])
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    try:
+        chunks.append(page.url or "")
+    except Exception:
+        pass
+
+    for chunk in chunks:
+        pnr = extract_pnr(chunk)
+        if pnr:
+            return pnr
+        bare = re.fullmatch(r"\s*([A-Za-z0-9]{5,8})\s*", chunk or "")
+        if bare and _looks_like_pnr(bare.group(1)):
+            return bare.group(1).upper()
+    return ""
+
+
+async def dump_pnr_debug(page, body: str, tag: str) -> None:
+    """Write confirmation text/HTML when PNR capture fails (for the next fix)."""
+    try:
+        assert CFG is not None
+        out_dir = Path(CFG.output).expanduser().resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        base = out_dir / f"pnr_debug_{tag}_{stamp}"
+        (base.with_suffix(".txt")).write_text(
+            f"URL: {page.url}\n\n{(body or '')[:12000]}\n",
+            encoding="utf-8",
+        )
+        html = await page.content()
+        (base.with_suffix(".html")).write_text(html, encoding="utf-8")
+        print(f"    💾 Saved PNR debug dump → {base}.txt / .html")
+    except Exception as exc:
+        print(f"    ⚠️ Could not save PNR debug dump: {exc}")
+
+
+async def collect_pnr(page, body: str, attempts: int = 6) -> str:
+    """Regex + DOM + HTML, with short retries (confirmation markup can lag)."""
+    for i in range(attempts):
+        pnr = extract_pnr(body)
+        if not pnr:
+            pnr = await scrape_pnr_from_dom(page)
+        if not pnr:
+            try:
+                html = await page.content()
+                pnr = extract_pnr(html)
+            except Exception:
+                pass
+        if pnr:
+            return pnr
+        if i + 1 < attempts:
+            await asyncio.sleep(1.5)
+            state = await read_page_state(page)
+            body = state.get("body") or body
+    return ""
+
+
+async def advance_through_booking(page, max_steps: int = 14) -> tuple[bool, str]:
+    """Return (ok, pnr_or_empty).
+
+    Important: do NOT treat intermediate 'Booking Details' review pages as success
+    until a PNR (or pay-within confirmation) is actually present.
+    """
     seen_headings: list[str] = []
     for step in range(max_steps):
         await asyncio.sleep(2)
@@ -393,32 +755,76 @@ async def advance_through_booking(page, max_steps: int = 10) -> tuple[bool, str]
         heading, body = state["heading"], state["body"]
         preview = state.get("preview") or body[:600]
         seen_headings.append(heading)
-        print(f"    [advance {step+1}] heading: {heading!r}")
+        print(f"    [advance {step+1}] heading: {heading!r} url={page.url!r}")
 
-        if (
-            "Booking Details" in body
-            or "PNR" in body
-            or "Please pay within" in body
-            or "Confirmed" in body
+        # Quick PNR scan (no long retries) — full collect happens on confirmation.
+        early_pnr = extract_pnr(body) or await scrape_pnr_from_dom(page)
+        if early_pnr and (
+            looks_like_final_confirmation(heading, body)
+            or "Please pay within" in (body or "")
+            or re.search(r"\bPNR\s*(?:No\.?|Number)\b", body or "", re.I)
         ):
-            pnr = extract_pnr(body)
+            print(f"  ✅ Booking confirmed! PNR={early_pnr}")
+            return True, early_pnr
+
+        if looks_like_final_confirmation(heading, body):
+            pnr = early_pnr or await collect_pnr(page, body, attempts=6)
             if pnr:
                 print(f"  ✅ Booking confirmed! PNR={pnr}")
-            else:
-                print("  ✅ Booking confirmed!")
-            return True, pnr
+                return True, pnr
+            print("    → Confirmation-looking page but PNR not readable yet; waiting…")
+            print("      Body start: " + preview.replace("\n", " ")[:280])
+            await dump_pnr_debug(page, body, "no_pnr_yet")
+            # One more wait cycle without clicking away
+            await asyncio.sleep(2.5)
+            pnr = await collect_pnr(page, body, attempts=4)
+            if pnr:
+                print(f"  ✅ Booking confirmed! PNR={pnr}")
+                return True, pnr
+            # If Next still exists, this may still be a pre-issue step — try Next once.
+            if await page.query_selector("#btnNextSaveStep a, a:has-text('Next')"):
+                print("    → Next still present; continuing flow")
+                await click_next(page)
+                continue
+            print("  ⚠️ Booking may be done but PNR was not captured.")
+            await dump_pnr_debug(page, body, "final_no_pnr")
+            return True, ""
+
+        if looks_like_review_page(heading, body):
+            print("    → Review / Booking Details (no PNR yet) — continuing")
+            await try_fill_group_name(page)
+            await click_next(page)
+            continue
 
         if "Book Now Pay Later" in body or "Payment" in heading or "Payment" in body[:200]:
             print("    → Payment: selecting Book Now Pay Later")
+            clicked_pay = False
             for sel in [
                 "text=Book Now Pay Later",
                 "div:has-text('Book Now Pay Later')",
+                "label:has-text('Book Now Pay Later')",
+                "input[type='radio'][value*='Later' i]",
             ]:
                 try:
                     await page.click(sel, timeout=2500)
+                    clicked_pay = True
                     break
                 except Exception:
                     continue
+            if not clicked_pay:
+                # Try selecting by evaluating radio labels
+                try:
+                    await page.evaluate(
+                        """
+                        () => {
+                          const nodes = Array.from(document.querySelectorAll('label, td, div, span'));
+                          const hit = nodes.find(n => /book now pay later/i.test(n.textContent || ''));
+                          if (hit) hit.click();
+                        }
+                        """
+                    )
+                except Exception:
+                    pass
             await asyncio.sleep(1)
             await click_next(page)
             continue
@@ -459,11 +865,22 @@ async def advance_through_booking(page, max_steps: int = 10) -> tuple[bool, str]
         print("      Body start: " + preview.replace("\n", " ")[:250])
         await try_fill_group_name(page)
         if not await click_next(page):
+            # Maybe we are already on a silent confirmation page
+            pnr = await collect_pnr(page, body, attempts=4)
+            if pnr:
+                print(f"  ✅ Booking confirmed! PNR={pnr}")
+                return True, pnr
             print("    ❌ No Next button on this page — cannot proceed.")
             print(f"      Pages seen so far: {seen_headings}")
+            await dump_pnr_debug(page, body, "stuck_no_next")
             return False, ""
 
     print(f"  ❌ Exceeded {max_steps} steps without confirmation. Seen: {seen_headings}")
+    try:
+        state = await read_page_state(page)
+        await dump_pnr_debug(page, state.get("body") or "", "max_steps")
+    except Exception:
+        pass
     return False, ""
 
 

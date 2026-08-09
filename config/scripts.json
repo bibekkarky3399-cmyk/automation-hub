@@ -1,6 +1,5 @@
 {
   "schema_version": "1.0.0",
-  "_comment_python": "Host OS only. macOS/Linux: .venv/bin/python3 — Windows: .venv\\\\Scripts\\\\python.exe",
   "python": ".venv/bin/python3",
   "output_dir": "outputs",
   "runtime": {
@@ -1004,6 +1003,252 @@
         "report_path": "CSV:\\s*(.+)",
         "rows_total": "rows_total=(\\d+)"
       }
+    },
+    {
+      "id": "series_fare",
+      "name": "Series Fare — TBO API upload",
+      "description": "Upload a PNR CSV to TBO via CheckMFA + addSeriesFare API.",
+      "icon": "bi-cloud-upload",
+      "badge": "Active",
+      "script": "scripts/series_fare/main.py",
+      "cwd": ".",
+      "enabled": true,
+      "timeout_seconds": 1800,
+      "form_note": "After OTP: paste TokenId (goes into body + Cookie pTokenId). Live POST uses browser-like Origin/Referer/Cookie. If Akamai blocks you, paste the full Cookie header from DevTools too.",
+      "summary_keys": [
+        "limit",
+        "dry_run"
+      ],
+      "stages": [
+        {
+          "id": "load",
+          "label": "Read CSV",
+          "match": "Loading sheet:"
+        },
+        {
+          "id": "map",
+          "label": "Map PNR → payload",
+          "match": "Detected PNR CSV"
+        },
+        {
+          "id": "auth",
+          "label": "Authenticate",
+          "match": "Auth:"
+        },
+        {
+          "id": "post",
+          "label": "POST addSeriesFare",
+          "match": "Row "
+        },
+        {
+          "id": "export",
+          "label": "Write CSV",
+          "match": "Writing CSV"
+        },
+        {
+          "id": "done",
+          "label": "Summarize",
+          "match": "SUMMARY"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "sheet",
+          "label": "PNR results CSV (or Series Fare sheet)",
+          "type": "file",
+          "required": true,
+          "group": "1 · CSV",
+          "width": "full",
+          "help": "PNR workflow CSV: status=booked + pnr. Grouped by route/flight/class into addSeriesFare calls.",
+          "accept": ".csv,.xlsx,.xls",
+          "cli": {
+            "flag": "--sheet",
+            "position": null
+          }
+        },
+        {
+          "id": "dry_run",
+          "label": "Practice run (build payload, do not POST)",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "group": "1 · CSV",
+          "width": "full",
+          "help": "ON = writes series_fare_payload_N.json under outputs/. Nothing hits TBO.",
+          "cli": {
+            "flag": "--dry-run",
+            "position": null,
+            "is_switch": true
+          }
+        },
+        {
+          "id": "limit",
+          "label": "Row limit (0 = all CSV rows)",
+          "type": "text",
+          "required": false,
+          "default": "0",
+          "group": "1 · CSV",
+          "width": "half",
+          "input_type": "number",
+          "cli": {
+            "flag": "--limit",
+            "position": null
+          },
+          "help": "Each CSV row becomes one addSeriesFare API call. 0 posts every row."
+        },
+        {
+          "id": "disable_before_hrs",
+          "label": "Disable before departure (hrs)",
+          "type": "text",
+          "required": false,
+          "default": "24",
+          "group": "1 · CSV",
+          "width": "half",
+          "input_type": "number",
+          "help": "Not in the CSV — applied to every DayAllocation row as DisableBeforeDept.",
+          "cli": {
+            "flag": "--disable-before-hrs",
+            "position": null
+          }
+        },
+        {
+          "id": "token_id",
+          "label": "TokenId (after OTP)",
+          "type": "text",
+          "required": false,
+          "default": "",
+          "group": "2 · Auth from TBO UI",
+          "width": "full",
+          "placeholder": "eyJraWQiOiJ…",
+          "help": "Paste after OTP. Used in practice run payload and live POST.",
+          "cli": {
+            "flag": "--token-id",
+            "position": null
+          }
+        },
+        {
+          "id": "trace_id",
+          "label": "TraceId (after OTP)",
+          "type": "text",
+          "required": false,
+          "default": "",
+          "group": "2 · Auth from TBO UI",
+          "width": "full",
+          "placeholder": "2e5fc0a3-1b2b-4889-afa5-da3666fbdbc9",
+          "help": "Paste after OTP. Included in practice run payload and live POST.",
+          "cli": {
+            "flag": "--trace-id",
+            "position": null
+          }
+        },
+        {
+          "id": "agency_id",
+          "label": "AgencyId",
+          "type": "text",
+          "required": false,
+          "default": "73858",
+          "group": "2 · Auth from TBO UI",
+          "width": "half",
+          "help": "Also in the JWT / addSeriesFare body (TokenAgencyId).",
+          "cli": {
+            "flag": "--agency-id",
+            "position": null
+          }
+        },
+        {
+          "id": "member_id",
+          "label": "TokenMemberId",
+          "type": "text",
+          "required": false,
+          "default": "156197",
+          "group": "2 · Auth from TBO UI",
+          "width": "half",
+          "cli": {
+            "flag": "--member-id",
+            "position": null
+          }
+        },
+        {
+          "id": "cookie",
+          "label": "Browser Cookie header (optional)",
+          "type": "text",
+          "required": false,
+          "default": "",
+          "group": "2 · Auth from TBO UI",
+          "width": "full",
+          "placeholder": "agencyId=73858; memberId=156197; pTokenId=eyJ…; ak_bmsc=…",
+          "help": "Paste the full Cookie header from DevTools if live POST is blocked. TokenId / AgencyId / MemberId from the form still override auth keys.",
+          "advanced": true,
+          "collapsed": true,
+          "cli": {
+            "flag": "--cookie",
+            "position": null
+          }
+        },
+        {
+          "id": "session_file",
+          "label": "Saved token file",
+          "type": "text",
+          "required": false,
+          "default": ".tbo_api_session.json",
+          "group": "Advanced",
+          "width": "half",
+          "advanced": true,
+          "collapsed": true,
+          "cli": {
+            "flag": "--session-file",
+            "position": null
+          }
+        }
+      ],
+      "progress_hints": [
+        {
+          "match": "Loading sheet:",
+          "label": "Reading CSV…"
+        },
+        {
+          "match": "Detected PNR CSV",
+          "label": "Mapping PNR → API payload…"
+        },
+        {
+          "match": "Auth:",
+          "label": "Authenticating…"
+        },
+        {
+          "match": "Row ",
+          "label": "Posting inventory…"
+        },
+        {
+          "match": "Dry run",
+          "label": "Writing practice payload…"
+        },
+        {
+          "match": "Writing CSV",
+          "label": "Writing results…"
+        },
+        {
+          "match": "SUMMARY",
+          "label": "Summarizing…"
+        }
+      ],
+      "report": {
+        "stdout_line_prefix": "CSV:",
+        "search_dir": "outputs",
+        "glob": "*.csv",
+        "pick": "newest_after_start",
+        "result_ui": {
+          "mode": "per_source",
+          "title": "Upload results",
+          "lead": "API upload results CSV.",
+          "stats": "collect"
+        }
+      },
+      "summary_patterns": {
+        "added": "SUMMARY:\\s*added=(\\d+)",
+        "failed": "SUMMARY:\\s*added=\\d+\\s+failed=(\\S+)",
+        "report_path": "CSV:\\s*(.+)",
+        "rows_total": "rows_total=(\\d+)"
+      }
     }
   ],
   "pipelines": [
@@ -1026,6 +1271,34 @@
           "id": "booking_api",
           "label": "United Solutions → CSV",
           "script_id": "booking_api"
+        }
+      ]
+    },
+    {
+      "id": "pnr_to_tbo",
+      "name": "PNR → TBO Series Fare (API)",
+      "description": "Book Yeti PNRs, then POST the CSV to TBO addSeriesFare.",
+      "icon": "bi-diagram-3",
+      "badge": "Pipeline",
+      "enabled": true,
+      "timeout_seconds": 10800,
+      "form_note": "Practice run stays ON by default on the TBO step. Turn it off only after a payload looks right.",
+      "steps": [
+        {
+          "id": "pnr",
+          "label": "Book PNRs",
+          "script_id": "pnr"
+        },
+        {
+          "id": "series_fare",
+          "label": "Upload to TBO",
+          "script_id": "series_fare",
+          "bind": {
+            "sheet": "steps.pnr.report_path"
+          },
+          "hide_inputs": [
+            "sheet"
+          ]
         }
       ]
     }

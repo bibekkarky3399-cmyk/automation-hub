@@ -148,24 +148,28 @@ log "Venv Python: ${PY}"
 "${PY}" -c "import sys; print(sys.executable); print(sys.version); assert sys.version_info[:2]==(3,14), 'venv is not Python 3.14'"
 
 # --- 4) Point Helix jobs at Windows venv python ---
+# Use forward slashes only — JSON treats "\S" as an invalid escape and
+# breaks city/search loading (ConfigError / JSONDecodeError: Invalid \escape).
 SCRIPTS_JSON="${ROOT}/config/scripts.json"
 if [[ -f "${SCRIPTS_JSON}" ]]; then
-  log "Setting config/scripts.json python → .venv\\\\Scripts\\\\python.exe"
+  log "Setting config/scripts.json python → .venv/Scripts/python.exe"
   "${PY}" - <<'PY'
 from pathlib import Path
+import json
 import re
+
 path = Path("config/scripts.json")
 text = path.read_text(encoding="utf-8")
-# JSON value uses doubled backslashes: .venv\\Scripts\\python.exe
-replacement = '"python": ".venv\\\\Scripts\\\\python.exe"'
+# Forward slashes: valid JSON and accepted by Windows Python.
+win_py = ".venv/Scripts/python.exe"
+replacement = f'"python": "{win_py}"'
 new_text, n = re.subn(r'"python"\s*:\s*"[^"]*"', replacement, text, count=1)
 if n != 1:
     raise SystemExit(f"could not patch python path in {path} (matches={n})")
-if new_text != text:
-    path.write_text(new_text, encoding="utf-8")
-    print("updated", path)
-else:
-    print("already set", path)
+path.write_text(new_text, encoding="utf-8")
+# Verify the file still parses (this is what broke "Could not load cities").
+json.loads(path.read_text(encoding="utf-8"))
+print("updated + validated", path, "→", win_py)
 PY
 fi
 

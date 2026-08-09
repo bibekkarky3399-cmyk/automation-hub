@@ -22,12 +22,53 @@ class ConfigError(Exception):
     pass
 
 
+def _repair_scripts_json_windows_escapes(raw: str) -> str | None:
+    """Fix common Windows path mistakes that make scripts.json invalid JSON.
+
+    Writing `"python": ".venv\\Scripts\\python.exe"` with single backslashes
+    yields JSON `Invalid \\escape` (e.g. `\\S`) and breaks public flights.
+    Prefer forward slashes, which Windows Python accepts.
+    """
+    repaired = raw
+    # "python": "...anything with backslashes..."
+    repaired = re.sub(
+        r'("python"\s*:\s*")([^"]*)(")',
+        lambda m: m.group(1) + m.group(2).replace("\\", "/") + m.group(3),
+        repaired,
+        count=1,
+    )
+    # Comment line often has the same bad Windows example.
+    repaired = re.sub(
+        r'("_comment_python"\s*:\s*")([^"]*)(")',
+        lambda m: m.group(1) + m.group(2).replace("\\", "/") + m.group(3),
+        repaired,
+        count=1,
+    )
+    if repaired == raw:
+        return None
+    try:
+        json.loads(repaired)
+    except json.JSONDecodeError:
+        return None
+    return repaired
+
+
 @lru_cache(maxsize=1)
 def load_scripts_config() -> dict[str, Any]:
     if not CONFIG_PATH.is_file():
         raise ConfigError(f"Missing configuration: {CONFIG_PATH}")
-    with CONFIG_PATH.open(encoding="utf-8") as fh:
-        data = json.load(fh)
+    raw = CONFIG_PATH.read_text(encoding="utf-8")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        fixed = _repair_scripts_json_windows_escapes(raw)
+        if not fixed:
+            raise ConfigError(
+                f"Invalid scripts.json ({exc}). On Windows set "
+                f'"python": ".venv/Scripts/python.exe" with forward slashes.'
+            ) from exc
+        CONFIG_PATH.write_text(fixed, encoding="utf-8")
+        data = json.loads(fixed)
 
     from launcher.schema_validator import assert_valid_config
 

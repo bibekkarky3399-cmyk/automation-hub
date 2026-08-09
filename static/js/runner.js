@@ -418,6 +418,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("inp_csv_mode")?.addEventListener("change", syncInputModeVisibility);
     document.getElementById("inp_mode")?.addEventListener("change", syncInputModeVisibility);
     document.getElementById("inp_trip_type")?.addEventListener("change", syncInputModeVisibility);
+
+    // Any field referenced by show_when (booleans like dry_run, selects, etc.)
+    // must re-sync visibility when it changes — not only the hard-coded ids above.
+    const watched = new Set();
+    inputs.forEach((inp) => {
+      if (!inp.show_when || typeof inp.show_when !== "object") return;
+      Object.keys(inp.show_when).forEach((id) => watched.add(id));
+    });
+    watched.forEach((id) => {
+      document
+        .getElementById(`inp_${id}`)
+        ?.addEventListener("change", syncInputModeVisibility);
+    });
   }
 
   function setupFileDropzone(inp) {

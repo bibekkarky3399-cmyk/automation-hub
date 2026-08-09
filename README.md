@@ -15,12 +15,23 @@ Local ops launcher for airline workflows: OCR → CSV, Yeti B2B PNR booking, and
 - Python **3.10+**
 - macOS / Linux / Windows
 - Playwright Chromium (PNR workflow)
+- **Yeti API PNR** (`scripts/pnr/yeti_api_book.py`) — same B2B ASMX calls as the portal, no browser (requires sibling `aggregator` repo client)
 
 ## Setup & run locally
 
 ### 1. Install
 
-**macOS / Linux**
+**macOS (one script)**
+
+```bash
+cd /path/to/automation-hub
+bash deploy/run-macos.sh
+```
+
+This clears caches, ensures a macOS `.venv`, installs deps, and starts `app.py` at http://127.0.0.1:5050.  
+Flags: `--fresh` (recreate venv), `--no-run` (setup only).
+
+**macOS / Linux (manual)**
 
 ```bash
 cd /path/to/automation-hub
@@ -55,15 +66,15 @@ In `config/scripts.json`, set `"python"` for the OS that will **run** Helix (the
 | OS | `"python"` value |
 |----|------------------|
 | macOS / Linux | `.venv/bin/python3` |
-| Windows | `.venv\\Scripts\\python.exe` |
+| Windows | `.venv/Scripts/python.exe` (forward slashes — backslashes break JSON) |
 
 Example on Windows:
 
 ```json
-"python": ".venv\\Scripts\\python.exe"
+"python": ".venv/Scripts/python.exe"
 ```
 
-If that path is missing, Helix falls back to the interpreter that started `app.py` — still set the correct path so background jobs use the venv reliably.
+Do **not** write `.venv\\Scripts\\python.exe` with single `\` characters in the JSON file — that causes `Invalid \escape` and breaks features like flight city loading.
 
 ### 3. Configure auth
 
