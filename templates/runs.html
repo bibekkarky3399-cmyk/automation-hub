@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block body_class %}page-home page-runs{% endblock %}
+{% block title %}{% if selected_name %}{{ selected_name }} history{% else %}History{% endif %} — Helix{% endblock %}
+
+{% block content %}
+{% set start_n = ((page - 1) * page_size) + 1 if total_runs else 0 %}
+{% set end_n = (page * page_size if page * page_size < total_runs else total_runs) if total_runs else 0 %}
+{% set range_label =
+  'Today' if date_preset == 'today'
+  else 'Last 7 days' if date_preset == '7d'
+  else 'All time' if date_preset == 'all'
+  else ((date_from ~ (' → ' ~ date_to if date_to and date_to != date_from else '')) if date_from else 'Custom')
+%}
+
+<section class="runs-page fade-in" aria-labelledby="runsTitle">
+  <header class="runs-masthead">
+    <div class="runs-masthead-copy">
+      <nav class="runs-crumb" aria-label="Breadcrumb">
+        <a href="/">Today</a>
+        <span aria-hidden="true">/</span>
+        <a href="/history">History</a>
+        {% if selected_name %}
+        <span aria-hidden="true">/</span>
+        <span>{{ selected_name }}</span>
+        {% endif %}
+      </nav>
+      <h1 id="runsTitle" class="runs-title">
+        {% if selected_name %}{{ selected_name }}{% else %}History{% endif %}
+      </h1>
+      <p class="runs-lead">
+        {% if selected_script_id %}
+        Past runs for this job, newest first.
+        {% else %}
+        Past runs across your jobs, newest first.
+        {% endif %}
+      </p>
+      <div class="runs-masthead-meta">
+        <span class="runs-meta-pill">{{ range_label }}</span>
+        {% if total_runs %}
+        <span class="runs-meta-count">{{ total_runs }} entr{{ 'y' if total_runs == 1 else 'ies' }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+  </header>
+
+  <div class="runs-toolbar">
+    <div class="runs-toolbar-row">
+      <div class="runs-filter">
+        <span class="runs-filter-label">When</span>
+        <div class="runs-seg" role="group" aria-label="When">
+          <a href="{{ runs_qs(range='today', date_from=None, date_to=None, page=None) }}"
+             class="runs-seg-item {% if date_preset == 'today' %}is-active{% endif %}">Today</a>
+          <a href="{{ runs_qs(range='7d', date_from=None, date_to=None, page=None) }}"
+             class="runs-seg-item {% if date_preset == '7d' %}is-active{% endif %}">7 days</a>
+          <a href="{{ runs_qs(range='all', date_from=None, date_to=None, page=None) }}"
+             class="runs-seg-item {% if date_preset == 'all' %}is-active{% endif %}">Everything</a>
+        </div>
+      </div>
+
+      <form class="runs-range-form" method="get" action="/history">
+        {% if selected_script_id %}
+        <input type="hidden" name="workflow" value="{{ selected_script_id }}">
+        {% endif %}
+        {% if status_filter %}
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        {% endif %}
+        {% if search_q %}
+        <input type="hidden" name="q" value="{{ search_q }}">
+        {% endif %}
+        <label class="runs-range-field">
+          <span>From</span>
+          <input type="date" name="from" value="{{ date_from }}" required>
+        </label>
+        <span class="runs-range-dash" aria-hidden="true">–</span>
+        <label class="runs-range-field">
+          <span>To</span>
+          <input type="date" name="to" value="{{ date_to or date_from }}" required>
+        </label>
+        <button type="submit" class="runs-range-submit">Show</button>
+      </form>
+    </div>
+
+    <div class="runs-toolbar-row runs-toolbar-row-secondary">
+      <div class="runs-filter">
+        <span class="runs-filter-label">Result</span>
+        <div class="runs-seg" role="group" aria-label="Result">
+          <a href="{{ runs_qs(status=None, page=None) }}"
+             class="runs-seg-item {% if not status_filter %}is-active{% endif %}">All</a>
+          <a href="{{ runs_qs(status='success', page=None) }}"
+             class="runs-seg-item {% if status_filter == 'success' %}is-active{% endif %}">Worked</a>
+          <a href="{{ runs_qs(status='failed', page=None) }}"
+             class="runs-seg-item {% if status_filter == 'failed' %}is-active{% endif %}">Failed</a>
+          <a href="{{ runs_qs(status='cancelled', page=None) }}"
+             class="runs-seg-item {% if status_filter == 'cancelled' %}is-active{% endif %}">Stopped</a>
+          <a href="{{ runs_qs(status='timeout', page=None) }}"
+             class="runs-seg-item {% if status_filter == 'timeout' %}is-active{% endif %}">Timeout</a>
+        </div>
+      </div>
+
+      <form class="runs-search-form" method="get" action="/history" role="search">
+        {% if selected_script_id %}
+        <input type="hidden" name="workflow" value="{{ selected_script_id }}">
+        {% endif %}
+        {% if status_filter %}
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        {% endif %}
+        {% if date_preset == 'custom' %}
+        <input type="hidden" name="from" value="{{ date_from }}">
+        <input type="hidden" name="to" value="{{ date_to }}">
+        {% elif date_preset and date_preset != 'today' %}
+        <input type="hidden" name="range" value="{{ date_preset }}">
+        {% endif %}
+        <label class="runs-search-field" for="runsHistorySearch">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <input
+            type="search"
+            id="runsHistorySearch"
+            name="q"
+            value="{{ search_q or '' }}"
+            placeholder="Search run name, workflow, job id…"
+            autocomplete="off"
+          >
+        </label>
+        {% if search_q %}
+        <a href="{{ runs_qs(q=None, page=None) }}" class="runs-search-clear" title="Clear search">Clear</a>
+        {% endif %}
+        <button type="submit" class="runs-range-submit">Search</button>
+      </form>
+
+      <div class="runs-job-picker" data-runs-job-picker>
+        <span class="runs-filter-label" id="runsJobLabel">Which job</span>
+        <label class="runs-job-search" for="runsJobSearch">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <input
+            type="search"
+            id="runsJobSearch"
+            placeholder="Search jobs…"
+            value="{{ selected_name or '' }}"
+            autocomplete="off"
+            aria-labelledby="runsJobLabel"
+            aria-controls="runsJobResults"
+          >
+        </label>
+        <div class="runs-job-results" id="runsJobResults" role="listbox" aria-label="Matching jobs">
+          <a
+            href="{{ runs_qs(workflow=None, page=None) }}"
+            class="runs-job-option{% if not selected_script_id %} is-active{% endif %}"
+            role="option"
+            data-name="all jobs"
+          >
+            <span class="runs-job-option-name">All jobs</span>
+          </a>
+          {% for script in scripts %}
+          <a
+            href="{{ runs_qs(workflow=script.id, page=None) }}"
+            class="runs-job-option{% if selected_script_id == script.id %} is-active{% endif %}"
+            role="option"
+            data-name="{{ (script.name ~ ' ' ~ script.id ~ ' ' ~ (script.badge or '')) | lower | e }}"
+          >
+            <span class="runs-job-option-name">{{ script.name }}</span>
+            {% if script.badge %}
+            <span class="runs-job-option-type">{{ script.badge }}</span>
+            {% endif %}
+          </a>
+          {% endfor %}
+          {% for pipe in pipelines or [] %}
+          <a
+            href="{{ runs_qs(workflow='pipeline:' ~ pipe.id, page=None) }}"
+            class="runs-job-option{% if selected_script_id == 'pipeline:' ~ pipe.id %} is-active{% endif %}"
+            role="option"
+            data-name="{{ (pipe.name ~ ' ' ~ pipe.id ~ ' chain pipeline') | lower | e }}"
+          >
+            <span class="runs-job-option-name">{{ pipe.name }}</span>
+            <span class="runs-job-option-type">Chain</span>
+          </a>
+          {% endfor %}
+          <p class="runs-job-empty d-none" id="runsJobEmpty">No matching jobs.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if runs %}
+  <div class="runs-timeline">
+    {% set ns = namespace(day='') %}
+    {% for run in runs %}
+    {% if run.day_key != ns.day %}
+    {% set ns.day = run.day_key %}
+    <div class="runs-day">
+      <h2 class="runs-day-label">{{ run.day_label }}</h2>
+    </div>
+    {% endif %}
+
+    {% set status = run.status_key or run.status or 'unknown' %}
+    {% set reuse_href =
+      ('/pipeline/' ~ run.script_id.split(':', 1)[1] ~ '?reuse=' ~ run.job_id)
+      if run.script_id and run.script_id.startswith('pipeline:')
+      else (('/runner/' ~ run.script_id ~ '?reuse=' ~ run.job_id) if run.script_id else '')
+    %}
+    <article class="runs-row runs-row-{{ status }}">
+      <a class="runs-row-main" href="/history/{{ run.job_id }}">
+        <span class="runs-row-rail" aria-hidden="true">
+          <span class="runs-row-dot"></span>
+        </span>
+        <span class="runs-row-body">
+          <span class="runs-row-topline">
+            <span class="runs-row-name">{{ run.display_name or run.script_name or run.script_id }}</span>
+            <span class="runs-row-status">{{ run.status_label }}</span>
+          </span>
+          <span class="runs-row-meta">
+            {% if run.has_custom_run_name %}
+            <span class="runs-row-workflow">{{ run.workflow_name or run.script_name }}</span>
+            {% endif %}
+            {% if run.started_by %}
+            <span>{{ run.started_by }}</span>
+            {% endif %}
+            <time datetime="{{ run.finished_at or run.recorded_at or '' }}" title="{{ run.when_title }}">
+              {{ run.time_label }} <span>UTC</span>
+            </time>
+            {% if run.duration_label %}
+            <span class="runs-row-dur">{{ run.duration_label }}</span>
+            {% endif %}
+          </span>
+          {% if run.outcome_line or run.outcome_headline %}
+          <span class="runs-row-outcome">
+            {% if run.outcome_headline and status == 'success' %}{{ run.outcome_headline }}{% endif %}
+            {% if run.outcome_line %}{% if run.outcome_headline and status == 'success' %} · {% endif %}{{ run.outcome_line }}{% endif %}
+          </span>
+          {% endif %}
+        </span>
+      </a>
+      <div class="runs-row-actions">
+        <a href="/history/{{ run.job_id }}" class="runs-row-action is-details" title="View run details">
+          <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
+          <span>Details</span>
+        </a>
+        {% if reuse_href %}
+        <a href="{{ reuse_href }}" class="runs-row-action is-rerun" title="Run again with the same settings">
+          <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+          <span>Run again</span>
+        </a>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  <footer class="runs-footer">
+    <p class="runs-footer-meta">
+      {% if total_runs %}
+      Showing {{ start_n }}–{{ end_n }} of {{ total_runs }}
+      {% endif %}
+    </p>
+    {% if pages > 1 %}
+    <nav class="runs-pager" aria-label="History pages">
+      {% if has_prev %}
+      <a class="runs-pager-btn" href="{{ runs_qs(page=page - 1) }}">
+        <i class="bi bi-chevron-left" aria-hidden="true"></i> Newer
+      </a>
+      {% else %}
+      <span class="runs-pager-btn is-disabled">Newer</span>
+      {% endif %}
+      <span class="runs-pager-pos">{{ page }} / {{ pages }}</span>
+      {% if has_next %}
+      <a class="runs-pager-btn" href="{{ runs_qs(page=page + 1) }}">
+        Older <i class="bi bi-chevron-right" aria-hidden="true"></i>
+      </a>
+      {% else %}
+      <span class="runs-pager-btn is-disabled">Older</span>
+      {% endif %}
+    </nav>
+    {% endif %}
+  </footer>
+
+  {% else %}
+  <div class="runs-empty">
+    <div class="runs-empty-visual" aria-hidden="true">
+      <i class="bi bi-journal-text"></i>
+    </div>
+    <h2 class="runs-empty-title">Nothing in this view yet</h2>
+    <p class="runs-empty-copy">
+      {% if search_q %}
+      No runs match “{{ search_q }}”. Try a job id fragment, error word, or filename.
+      {% elif date_preset == 'today' %}
+      No jobs ran today. Try the last 7 days to look further back.
+      {% elif date_preset != 'all' %}
+      Nothing matches these filters. Widen the dates or choose All results.
+      {% elif selected_script_id %}
+      This job hasn’t left a trail yet. Start it once and it will show up here.
+      {% else %}
+      Once a job finishes, it appears here so you can open it or run it again.
+      {% endif %}
+    </p>
+    <div class="runs-empty-actions">
+      {% if date_preset == 'today' %}
+      <a href="{{ runs_qs(range='7d', date_from=None, date_to=None, page=None) }}" class="btn btn-outline-secondary">
+        Last 7 days
+      </a>
+      {% endif %}
+      {% if selected_script_id and selected_script_id.startswith('pipeline:') %}
+      <a href="/pipeline/{{ selected_script_id.split(':', 1)[1] }}" class="btn btn-primary">Start this chain</a>
+      {% elif selected_script_id %}
+      <a href="/runner/{{ selected_script_id }}" class="btn btn-primary">Start this job</a>
+      {% else %}
+      <a href="/workflows" class="btn btn-primary">Browse workflows</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/runs.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Helix — a precise desk to start work, follow progress, and collect finished results.">
+  <meta name="theme-color" content="#22222c">
+  <title>{% block title %}Helix{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2314532d'/><path fill='%23ecfdf5' d='M15.2 6.2h1.6v2.2c2.9.3 5.2 2.7 5.2 5.7v1.1h1.5v2.2h-1.5v5.4c0 1.4-1.1 2.5-2.5 2.5h-1.1v1.7h-2.2v-1.7h-1.1c-1.4 0-2.5-1.1-2.5-2.5v-5.4H9.9v-2.2h1.5v-1.1c0-3 2.3-5.4 5.2-5.7V6.2zm-2.4 9.2c-.5 0-.9.4-.9.9s.4.9.9.9.9-.4.9-.9-.4-.9-.9-.9zm6.4 0c-.5 0-.9.4-.9.9s.4.9.9.9.9-.4.9-.9-.4-.9-.9-.9zM13.5 20h5v1.4c0 .3-.2.5-.5.5h-4c-.3 0-.5-.2-.5-.5V20z'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        if (sessionStorage.getItem("helixPageTransitAt")) {
+          document.documentElement.classList.add("helix-transit");
+        }
+      } catch (e) {}
+    })();
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body class="app-body {% block body_class %}{% endblock %}"{% if current_user %} data-authenticated="1"{% endif %}>
+  <div id="pageTransit" class="page-transit" hidden aria-hidden="true" role="status" aria-live="polite" aria-label="Loading">
+    <div class="page-transit-inner">
+      <div class="page-transit-rocket" aria-hidden="true">
+        <i class="bi bi-rocket-takeoff-fill"></i>
+        <span class="page-transit-flame"></span>
+        <span class="page-transit-trail"></span>
+      </div>
+      <p class="page-transit-label">Loading</p>
+    </div>
+  </div>
+  <nav class="navbar navbar-expand-lg sticky-top app-navbar" aria-label="Primary">
+    <div class="container-fluid app-shell app-navbar-inner">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+        <span class="brand-mark"><i class="bi bi-robot"></i></span>
+        <span class="brand-text">Helix</span>
+      </a>
+      <div class="d-flex align-items-center gap-2 gap-md-3 app-navbar-end">
+        <div class="app-nav-links d-none d-md-flex" role="navigation">
+          <a href="/" class="nav-link-quiet{% if request.path == '/' %} is-active{% endif %}">Today</a>
+          <a href="/workflows" class="nav-link-quiet{% if request.path.startswith('/workflows') %} is-active{% endif %}">Workflows</a>
+          <a href="/jobs" class="nav-link-quiet{% if request.path.startswith('/jobs') %} is-active{% endif %}">
+            Active
+            <span class="nav-jobs-badge d-none" id="navJobsBadge" aria-hidden="true">0</span>
+          </a>
+          <a href="/history" class="nav-link-quiet{% if request.path.startswith('/history') %} is-active{% endif %}">History</a>
+          <a href="/metrics" class="nav-link-quiet{% if request.path.startswith('/metrics') %} is-active{% endif %}">Metrics</a>
+          {% if is_admin %}
+          <a href="/settings" class="nav-link-quiet{% if request.path.startswith('/settings') %} is-active{% endif %}">Settings</a>
+          {% endif %}
+        </div>
+        <div class="status-pill d-none d-sm-flex" id="navStatus" aria-live="polite">
+          <span class="status-dot"></span>
+          <span class="status-label">Checking…</span>
+          <span class="status-version" title="Helix version">v{{ app_version }}</span>
+        </div>
+        {% if current_user %}
+        <span class="nav-user d-none d-lg-inline" title="Signed in as {{ current_role }}">
+          <i class="bi bi-person-circle" aria-hidden="true"></i>
+          {{ current_user }}
+          <span class="nav-role">{{ current_role }}</span>
+        </span>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm app-nav-logout" title="Sign out">
+          <i class="bi bi-box-arrow-right"></i>
+        </a>
+        {% endif %}
+        <button
+          type="button"
+          class="btn app-nav-toggle d-md-none"
+          id="navMenuToggle"
+          aria-expanded="false"
+          aria-controls="mobileNav"
+          aria-label="Open menu"
+        >
+          <i class="bi bi-list" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div class="app-mobile-nav d-md-none d-none" id="mobileNav" role="navigation" aria-label="Mobile">
+      <div class="container-fluid app-shell app-mobile-nav-inner">
+        <a href="/" class="app-mobile-link{% if request.path == '/' %} is-active{% endif %}">Today</a>
+        <a href="/workflows" class="app-mobile-link{% if request.path.startswith('/workflows') %} is-active{% endif %}">Workflows</a>
+        <a href="/jobs" class="app-mobile-link{% if request.path.startswith('/jobs') %} is-active{% endif %}">
+          Active jobs
+          <span class="nav-jobs-badge d-none" data-nav-jobs-badge aria-hidden="true">0</span>
+        </a>
+        <a href="/history" class="app-mobile-link{% if request.path.startswith('/history') %} is-active{% endif %}">History</a>
+        <a href="/metrics" class="app-mobile-link{% if request.path.startswith('/metrics') %} is-active{% endif %}">Metrics</a>
+        {% if is_admin %}
+        <a href="/settings" class="app-mobile-link{% if request.path.startswith('/settings') %} is-active{% endif %}">Settings</a>
+        {% endif %}
+        {% if current_user %}
+        <p class="app-mobile-user">
+          Signed in as <strong>{{ current_user }}</strong> · {{ current_role }}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid app-shell app-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="app-footer">
+    <div class="container-fluid app-shell app-footer-inner">
+      <div class="app-footer-brand">
+        <span class="brand-mark brand-mark-sm" aria-hidden="true">
+          <i class="bi bi-robot"></i>
+        </span>
+        <div class="app-footer-copy">
+          <span class="app-footer-name">Helix</span>
+          <span class="app-footer-tagline">Precision systems for everyday work</span>
+        </div>
+      </div>
+      <p class="app-footer-note">Secure access for your team</p>
+    </div>
+  </footer>
+
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastHost"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

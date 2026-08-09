@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block body_class %}page-home page-today{% endblock %}
+{% block title %}Today — Helix{% endblock %}
+
+{% block content %}
+{% set desk = desk or {} %}
+<section class="desk-page home-desk fade-in" aria-labelledby="homeTitle">
+  <header class="desk-masthead home-hero">
+    <div class="home-hero-copy">
+      <p class="home-eyebrow">Airline ops desk</p>
+      <h1 id="homeTitle" class="home-title">Today</h1>
+      <p class="home-lead">
+        See what needs attention today and grab finished files. Start new work from Workflows.
+      </p>
+    </div>
+    {% set last = ops.last_run if ops else none %}
+    <div class="home-ops" aria-label="What’s happening now">
+      <a href="/jobs" class="home-ops-card {% if ops.running_count %}is-live{% endif %}">
+        <span class="home-ops-kicker">Running now</span>
+        <strong class="home-ops-value">{{ ops.running_count or 0 }}</strong>
+        <span class="home-ops-note">{% if ops.running_count %}Open Active jobs{% else %}Nothing in the queue{% endif %}</span>
+      </a>
+      <a
+        href="/history?status=unfinished&range=today"
+        class="home-ops-card {% if desk.waiting_count %}is-alert{% endif %}"
+      >
+        <span class="home-ops-kicker">Needs attention</span>
+        <strong class="home-ops-value">{{ desk.waiting_count or 0 }}</strong>
+        <span class="home-ops-note">{% if desk.waiting_count %}Failed or stopped today{% else %}All clear today{% endif %}</span>
+      </a>
+      <a
+        href="/history?status=success&range=today"
+        class="home-ops-card {% if desk.ready_count %}is-live{% endif %}"
+      >
+        <span class="home-ops-kicker">Files ready</span>
+        <strong class="home-ops-value">{{ desk.ready_count or 0 }}</strong>
+        <span class="home-ops-note">{% if desk.ready_count %}Download from the board below{% else %}No files yet today{% endif %}</span>
+      </a>
+      {% if last %}
+      <a href="{{ last.href }}" class="home-ops-card is-{{ last.status }}">
+        <span class="home-ops-kicker">{% if last.is_mine %}Your last job{% else %}Latest job{% endif %}</span>
+        <strong class="home-ops-value home-ops-value-text">{{ last.display_name or last.script_name }}</strong>
+        <span class="home-ops-note">
+          {% if last.has_custom_run_name %}{{ last.workflow_name }} · {% endif %}{{ last.status_label }}{% if last.when_label %} · {{ last.when_label }}{% endif %}
+        </span>
+      </a>
+      {% else %}
+      <div class="home-ops-card is-empty">
+        <span class="home-ops-kicker">Your last job</span>
+        <strong class="home-ops-value home-ops-value-text">None yet</strong>
+        <span class="home-ops-note">Start from Workflows</span>
+      </div>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="today-board fade-in" aria-label="Shift board" style="animation-delay: 0.04s;">
+    <div class="today-board-grid">
+      <div class="today-panel {% if desk.waiting_count %}is-alert{% endif %}">
+        <header class="today-panel-head">
+          <h2 class="today-panel-title">Waiting on me</h2>
+          <p class="today-panel-sub">Failed or stopped today — fix and retry.</p>
+        </header>
+        <ul class="today-list">
+          {% for item in desk.waiting or [] %}
+          <li class="today-list-item">
+            <div class="today-list-main">
+              <span class="today-list-icon is-fail" aria-hidden="true"><i class="bi bi-exclamation-circle"></i></span>
+              <div class="today-list-copy">
+                <strong class="today-list-name">{{ item.display_name or item.script_name }}</strong>
+                <span class="today-list-line">
+                  {% if item.has_custom_run_name %}{{ item.workflow_name }} · {% endif %}{{ item.headline }}{% if item.line %} · {{ item.line }}{% endif %}
+                  {% if item.when_label %} · {{ item.when_label }}{% endif %}
+                </span>
+                {% if item.error_message %}
+                <span class="today-list-error">{{ item.error_message }}</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="today-list-actions">
+              <a href="{{ item.detail_href }}" class="btn btn-sm btn-outline-secondary">Details</a>
+              {% if item.reuse_href %}
+              <a href="{{ item.reuse_href }}" class="btn btn-sm btn-primary">Retry</a>
+              {% endif %}
+            </div>
+          </li>
+          {% else %}
+          <li class="today-list-empty">Nothing waiting — good shift so far.</li>
+          {% endfor %}
+        </ul>
+        {% if desk.waiting_count and desk.waiting_count > (desk.waiting|length) %}
+        <a href="/history?status=unfinished&range=today" class="today-panel-more">View all {{ desk.waiting_count }} in History</a>
+        {% endif %}
+      </div>
+
+      <div class="today-panel {% if desk.ready_count %}is-live{% endif %}">
+        <header class="today-panel-head">
+          <h2 class="today-panel-title">Ready to download</h2>
+          <p class="today-panel-sub">Finished files from today, newest first.</p>
+        </header>
+        <ul class="today-list">
+          {% for item in desk.ready or [] %}
+          <li class="today-list-item">
+            <div class="today-list-main">
+              <span class="today-list-icon is-ok" aria-hidden="true"><i class="bi bi-file-earmark-check"></i></span>
+              <div class="today-list-copy">
+                <strong class="today-list-name">{{ item.display_name or item.script_name }}</strong>
+                <span class="today-list-line">
+                  {% if item.has_custom_run_name %}{{ item.workflow_name }} · {% endif %}{{ item.headline }}{% if item.line %} · {{ item.line }}{% endif %}
+                  {% if item.when_label %} · {{ item.when_label }}{% endif %}
+                </span>
+                {% if item.needs_check %}
+                <span class="today-list-warn">QC flagged — review before sending on</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="today-list-actions">
+              {% if item.download_href %}
+              <a href="{{ item.download_href }}" class="btn btn-sm btn-primary" download>Download</a>
+              {% endif %}
+              <a href="{{ item.detail_href }}" class="btn btn-sm btn-outline-secondary">Open</a>
+            </div>
+          </li>
+          {% else %}
+          <li class="today-list-empty">No files ready yet. Start a workflow when you’re ready.</li>
+          {% endfor %}
+        </ul>
+        {% if desk.ready_count and desk.ready_count > (desk.ready|length) %}
+        <a href="/history?status=success&range=today" class="today-panel-more">View all {{ desk.ready_count }} in History</a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</section>
+{% endblock %}

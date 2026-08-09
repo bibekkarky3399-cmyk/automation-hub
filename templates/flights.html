@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Search Nepal domestic flights across airlines — live fares and schedules.">
+  <meta name="theme-color" content="#0b3d5c">
+  <title>Flight search — Helix</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230b3d5c'/><path fill='%23ecfeff' d='M6 18l20-8-8 20-3-7-9-5z'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/flights.css') }}" rel="stylesheet">
+</head>
+<body class="fx-body">
+  <div class="fx-sky" aria-hidden="true">
+    <div class="fx-sky-glow a"></div>
+    <div class="fx-sky-glow b"></div>
+    <div class="fx-sky-grid"></div>
+  </div>
+
+  <header class="fx-top">
+    <div class="fx-top-inner">
+      <a class="fx-brand" href="{{ url_for('flights_page') }}">
+        <span class="fx-mark" aria-hidden="true"><i class="bi bi-airplane-engines-fill"></i></span>
+        <span class="fx-brand-copy">
+          <strong>Helix Flights</strong>
+          <small>Nepal domestic search</small>
+        </span>
+      </a>
+      <nav class="fx-top-nav">
+        <a href="{{ url_for('login') }}">Team sign in</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="fx-main">
+    <section class="fx-hero" aria-labelledby="fxHeroTitle">
+      <p class="fx-kicker">All airlines · one search</p>
+      <h1 id="fxHeroTitle">Compare Nepal domestic flights.</h1>
+      <p class="fx-lead">Live schedules and fares — Buddha, Yeti, Shree, Saurya and more in one desk.</p>
+
+      <div class="fx-quick" id="quickRoutes" aria-label="Popular routes"></div>
+
+      <form class="fx-search" id="flightSearchForm" autocomplete="off">
+        <div class="fx-trip-toggle" role="group" aria-label="Trip type">
+          <label class="fx-trip-opt">
+            <input type="radio" name="trip_type" value="O" checked>
+            <span>One way</span>
+          </label>
+          <label class="fx-trip-opt">
+            <input type="radio" name="trip_type" value="R">
+            <span>Return</span>
+          </label>
+        </div>
+
+        <div class="fx-search-grid">
+          <label class="fx-field">
+            <span>From</span>
+            <select class="fx-control" id="sectorFrom" name="from" required></select>
+          </label>
+          <button type="button" class="fx-swap" id="btnSwapSectors" title="Swap cities" aria-label="Swap cities">
+            <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+          </button>
+          <label class="fx-field">
+            <span>To</span>
+            <select class="fx-control" id="sectorTo" name="to" required></select>
+          </label>
+          <label class="fx-field">
+            <span>Depart</span>
+            <input class="fx-control" type="date" id="flightDate" name="date" required>
+          </label>
+          <label class="fx-field fx-return-field is-disabled" id="returnField">
+            <span>Return</span>
+            <input class="fx-control" type="date" id="returnDate" name="return_date" disabled>
+          </label>
+          <label class="fx-field fx-field-pax">
+            <span>Travellers</span>
+            <div class="fx-pax">
+              <label>
+                Adults
+                <input class="fx-control fx-control-sm" type="number" id="adults" name="adults" min="1" max="9" value="1">
+              </label>
+              <label>
+                Children
+                <input class="fx-control fx-control-sm" type="number" id="children" name="children" min="0" max="9" value="0">
+              </label>
+            </div>
+          </label>
+        </div>
+
+        <div class="fx-search-actions">
+          <label class="fx-field fx-field-nat">
+            <span>Nationality</span>
+            <select class="fx-control" id="nationality" name="nationality" required>
+              <option value="NP" selected>Nepal (NP)</option>
+              <option value="IN">India (IN)</option>
+              <option value="CN">China (CN)</option>
+              <option value="US">United States (US)</option>
+              <option value="GB">United Kingdom (GB)</option>
+              <option value="AU">Australia (AU)</option>
+              <option value="CA">Canada (CA)</option>
+              <option value="JP">Japan (JP)</option>
+              <option value="KR">South Korea (KR)</option>
+              <option value="TH">Thailand (TH)</option>
+              <option value="SG">Singapore (SG)</option>
+              <option value="MY">Malaysia (MY)</option>
+              <option value="DE">Germany (DE)</option>
+              <option value="FR">France (FR)</option>
+              <option value="AE">UAE (AE)</option>
+              <option value="OTHER">Other / not listed</option>
+            </select>
+          </label>
+          <button type="submit" class="fx-search-btn" id="btnSearch">
+            <i class="bi bi-search" aria-hidden="true"></i>
+            Search flights
+          </button>
+        </div>
+        <p class="fx-form-error d-none" id="searchError" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="fx-results" id="resultsSection" hidden>
+      <div class="fx-results-head">
+        <div>
+          <h2 id="resultsTitle">Flights</h2>
+          <p class="fx-results-sub" id="resultsSub"></p>
+        </div>
+        <div class="fx-meta-pill" id="resultsMetaPill"></div>
+      </div>
+
+      <div class="fx-dir-tabs d-none" id="directionTabs" role="tablist" aria-label="Flight direction">
+        <button type="button" class="fx-dir-tab is-on" data-direction="Outbound" id="tabOutbound">Outbound</button>
+        <button type="button" class="fx-dir-tab" data-direction="Inbound" id="tabInbound">Return</button>
+      </div>
+
+      <div class="fx-toolbar" id="resultsToolbar">
+        <div class="fx-filter-row">
+          <span class="fx-filter-label">Airlines</span>
+          <div class="fx-filters" id="airlineFilters" role="group" aria-label="Filter by airline"></div>
+        </div>
+        <div class="fx-filter-row">
+          <span class="fx-filter-label">Time</span>
+          <div class="fx-filters" id="timeFilters" role="group" aria-label="Filter by time of day"></div>
+        </div>
+      </div>
+
+      <div class="fx-sortbar">
+        <label>
+          Sort
+          <select class="fx-control fx-control-sm" id="sortBy">
+            <option value="price">Cheapest</option>
+            <option value="time">Earliest departure</option>
+            <option value="airline">Airline</option>
+          </select>
+        </label>
+        <p class="fx-count" id="resultsCount"></p>
+      </div>
+
+      <div id="flightList" class="fx-list" aria-live="polite"></div>
+      <div class="fx-empty d-none" id="resultsEmpty">
+        <i class="bi bi-cloud" aria-hidden="true"></i>
+        <p>No flights matched these filters. Try another date, airline, or time of day.</p>
+      </div>
+    </section>
+
+    <section class="fx-loading d-none" id="loadingState" aria-live="polite">
+      <div class="fx-spinner" aria-hidden="true"></div>
+      <p>Checking airlines for live fares…</p>
+    </section>
+  </main>
+
+  <footer class="fx-foot">
+    <div class="fx-top-inner">
+      <span>Helix Flights · live search v{{ app_version }}</span>
+      <a href="{{ url_for('login') }}">Operator desk</a>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/flights.js') }}"></script>
+</body>
+</html>

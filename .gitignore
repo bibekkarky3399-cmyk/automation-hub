@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.py[cod]
+uploads/
+*.db
+data/
+.csv
+.env
+outputs/*
+!outputs/.gitkeep
+# Legacy per-workflow output folders (safe to delete)
+csv_output/*
+!csv_output/.gitkeep
+pnr_output/*
+!pnr_output/.gitkeep
+booking_api_output/*
+!booking_api_output/.gitkeep
+ocr_csv_output/*
+!ocr_csv_output/.gitkeep
+backups/
+!samples/**/*.csv

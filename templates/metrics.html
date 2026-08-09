@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block body_class %}page-home page-metrics{% endblock %}
+{% block title %}{% if selected_workflow %}{{ selected_workflow.script_name }} metrics{% else %}Metrics{% endif %} — Helix{% endblock %}
+
+{% block content %}
+<section class="desk-page fade-in" aria-labelledby="metricsTitle">
+  <header class="desk-masthead">
+    <div>
+      <nav class="desk-crumb" aria-label="Breadcrumb">
+        <a href="/workflows">Workflows</a>
+        <span aria-hidden="true">/</span>
+        <a href="/metrics">Metrics</a>
+        {% if selected_workflow %}
+        <span aria-hidden="true">/</span>
+        <span>{{ selected_workflow.script_name }}</span>
+        {% endif %}
+      </nav>
+      <h1 id="metricsTitle" class="desk-title">
+        {% if selected_workflow %}{{ selected_workflow.script_name }}{% else %}Metrics{% endif %}
+      </h1>
+      <p class="desk-lead">
+        {% if selected_workflow %}
+        See how often this job ran, how often it worked, and which days were busy.
+        {% else %}
+        See how often jobs ran, how often they worked, and which days were busy.
+        {% endif %}
+      </p>
+    </div>
+    <div class="desk-actions">
+      <div class="metrics-wf-picker" data-metrics-wf-picker>
+        <label class="metrics-wf-search" for="metricsWfSearch">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <input
+            type="search"
+            id="metricsWfSearch"
+            placeholder="Search workflows…"
+            autocomplete="off"
+            aria-label="Search workflows"
+            aria-controls="metricsWfResults"
+          >
+        </label>
+        <div class="metrics-wf-results" id="metricsWfResults" role="listbox" aria-label="Matching workflows">
+          <a
+            href="/metrics"
+            class="metrics-wf-option{% if not selected_script_id %} is-active{% endif %}"
+            role="option"
+            data-name="all workflows"
+          >
+            <span class="metrics-wf-option-name">All workflows</span>
+          </a>
+          {% for wf in workflows %}
+          <a
+            href="/metrics?workflow={{ wf.script_id }}"
+            class="metrics-wf-option{% if selected_script_id == wf.script_id %} is-active{% endif %}"
+            role="option"
+            data-name="{{ (wf.script_name ~ ' ' ~ wf.script_id ~ ' ' ~ (wf.badge or '')) | lower | e }}"
+          >
+            <span class="metrics-wf-option-name">{{ wf.script_name }}</span>
+            {% if wf.badge %}
+            <span class="metrics-wf-option-type">{{ wf.badge }}</span>
+            {% endif %}
+          </a>
+          {% endfor %}
+          <p class="metrics-wf-empty d-none" id="metricsWfEmpty">No matching workflows.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="home-metrics">
+    <div class="metrics-grid mb-4">
+      <div class="metric-tile">
+        <div class="metric-label">Times started</div>
+        <div class="metric-value">{{ metrics.runs_total or 0 }}</div>
+      </div>
+      <div class="metric-tile">
+        <div class="metric-label">Worked successfully</div>
+        <div class="metric-value">{% if metrics.success_rate is not none %}{{ (metrics.success_rate * 100)|round|int }}%{% else %}—{% endif %}</div>
+      </div>
+      <div class="metric-tile">
+        <div class="metric-label">Did not finish</div>
+        <div class="metric-value">{{ metrics.runs_failed or 0 }}</div>
+      </div>
+      <div class="metric-tile">
+        <div class="metric-label">Average time</div>
+        <div class="metric-value">{% if metrics.avg_duration_seconds is not none %}{{ metrics.avg_duration_seconds }}s{% else %}—{% endif %}</div>
+      </div>
+      {% if selected_script_id == 'pnr' or (not selected_script_id and metrics.avg_booked_per_run is not none) %}
+      <div class="metric-tile">
+        <div class="metric-label">Avg bookings each time</div>
+        <div class="metric-value">{{ metrics.avg_booked_per_run if metrics.avg_booked_per_run is not none else '—' }}</div>
+      </div>
+      {% else %}
+      <div class="metric-tile">
+        <div class="metric-label">Avg seconds per image</div>
+        <div class="metric-value">{{ metrics.avg_seconds_per_image if metrics.avg_seconds_per_image is not none else '—' }}</div>
+      </div>
+      <div class="metric-tile">
+        <div class="metric-label">Avg rows each time</div>
+        <div class="metric-value">{{ metrics.avg_rows_per_run if metrics.avg_rows_per_run is not none else '—' }}</div>
+      </div>
+      {% endif %}
+      <div class="metric-tile">
+        <div class="metric-label">Finished OK</div>
+        <div class="metric-value">{{ metrics.runs_success or 0 }}</div>
+      </div>
+    </div>
+
+    <div class="metrics-charts-row mb-4">
+      <div class="metrics-chart desk-panel metrics-pie-panel">
+        <div class="metrics-chart-head">
+          <div>
+            <h2 class="desk-section-title mb-0">Did it work?</h2>
+            <p class="desk-section-sub mb-0">Green means finished OK. Red means it did not finish.</p>
+          </div>
+        </div>
+        {% if outcome_pie and outcome_pie.total > 0 %}
+        <div class="metrics-pie-layout" data-pie-animate>
+          <div class="metrics-pie-stage" role="img" aria-label="Results pie chart">
+            <div
+              class="metrics-pie"
+              style="--pie-fill: conic-gradient({{ outcome_pie.gradient }});"
+            >
+              <span class="metrics-pie-shine" aria-hidden="true"></span>
+            </div>
+            <div class="metrics-pie-hole">
+              <span class="metrics-pie-total" data-pie-count="{{ outcome_pie.total }}">0</span>
+              <span class="metrics-pie-total-label">times</span>
+            </div>
+          </div>
+          <ul class="metrics-pie-legend">
+            {% for slice in outcome_pie.slices %}
+            <li style="--i: {{ loop.index0 }}">
+              <i class="legend-swatch {{ slice.swatch }}" aria-hidden="true"></i>
+              <span class="metrics-pie-legend-label">{{ slice.label }}</span>
+              <span class="metrics-pie-legend-value">
+                <span data-pie-count="{{ slice.count }}">0</span>
+                <em data-pie-count="{{ slice.pct }}" data-pie-suffix="%">0%</em>
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <p class="metrics-pie-empty mb-0">No runs yet to chart.</p>
+        {% endif %}
+      </div>
+
+      {% if workflow_pie and workflow_pie.total > 0 %}
+      <div class="metrics-chart desk-panel metrics-pie-panel">
+        <div class="metrics-chart-head">
+          <div>
+            <h2 class="desk-section-title mb-0">Which jobs were used most?</h2>
+            <p class="desk-section-sub mb-0">Bigger slice means that job was started more often.</p>
+          </div>
+        </div>
+        <div class="metrics-pie-layout" data-pie-animate>
+          <div class="metrics-pie-stage" role="img" aria-label="Runs by workflow pie chart">
+            <div
+              class="metrics-pie metrics-pie-workflows"
+              style="--pie-fill: conic-gradient({{ workflow_pie.gradient }});"
+            >
+              <span class="metrics-pie-shine" aria-hidden="true"></span>
+            </div>
+            <div class="metrics-pie-hole">
+              <span class="metrics-pie-total" data-pie-count="{{ workflow_pie.total }}">0</span>
+              <span class="metrics-pie-total-label">times</span>
+            </div>
+          </div>
+          <ul class="metrics-pie-legend">
+            {% for slice in workflow_pie.slices %}
+            <li style="--i: {{ loop.index0 }}">
+              <i class="legend-swatch legend-wf legend-wf-{{ slice.swatch_index }}" aria-hidden="true"></i>
+              <span class="metrics-pie-legend-label" title="{{ slice.label }}">{{ slice.label }}</span>
+              <span class="metrics-pie-legend-value">
+                <span data-pie-count="{{ slice.count }}">0</span>
+                <em data-pie-count="{{ slice.pct }}" data-pie-suffix="%">0%</em>
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if day_graph %}
+      <div class="metrics-chart desk-panel metrics-day-panel">
+        <div class="metrics-chart-head">
+          <div>
+            <h2 class="desk-section-title mb-0">When did work happen?</h2>
+            <p class="desk-section-sub mb-0">
+              A simple calendar for {{ day_graph.month_title }}. Each square is one day.
+            </p>
+          </div>
+          <div class="metrics-cal-summary">
+            <span>{{ day_graph.total_sum }} times started</span>
+            <span>{{ day_graph.success_rate }}% finished OK</span>
+          </div>
+        </div>
+
+        <p class="metrics-cal-howto">
+          <strong>How to read this:</strong>
+          The number is how many times a job started that day.
+          Greener / darker means a busier day. Point at a day for more detail.
+        </p>
+
+        <div class="metrics-cal" data-day-animate aria-label="Calendar of work by day">
+          <div class="metrics-cal-weekdays">
+            {% for day_name in day_graph.weekday_headers %}
+            <span>{{ day_name }}</span>
+            {% endfor %}
+          </div>
+
+          <div class="metrics-cal-grid">
+            {% for week in day_graph.weeks %}
+            <div class="metrics-cal-week">
+              {% for cell in week %}
+              <button
+                type="button"
+                class="metrics-cal-cell level-{{ cell.intensity }}{% if not cell.in_range %} is-outside{% endif %}{% if cell.is_today %} is-today{% endif %}{% if cell.total == 0 and cell.in_range %} is-empty{% endif %}"
+                style="--i: {{ loop.index0 }};"
+                {% if cell.in_range %}
+                title="{{ cell.weekday }}, {{ cell.day }}: started {{ cell.total }} time{{ 's' if cell.total != 1 else '' }}. Finished OK: {{ cell.success }}. Did not finish: {{ cell.failed }}."
+                aria-label="{{ cell.weekday }}, {{ cell.day }}: started {{ cell.total }} time{{ 's' if cell.total != 1 else '' }}"
+                {% else %}
+                tabindex="-1"
+                aria-hidden="true"
+                {% endif %}
+              >
+                <span class="metrics-cal-daynum">
+                  {% if cell.is_today %}Today · {% endif %}{{ cell.day_num }}
+                </span>
+                {% if cell.in_range %}
+                <span class="metrics-cal-count">
+                  {% if cell.total %}
+                  {{ cell.total }}
+                  <small>run{{ 's' if cell.total != 1 else '' }}</small>
+                  {% else %}
+                  <small class="metrics-cal-none">No work</small>
+                  {% endif %}
+                </span>
+                {% endif %}
+              </button>
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="metrics-cal-footer">
+            <div class="metrics-cal-scale" aria-hidden="true">
+              <span>Quiet day</span>
+              <i class="metrics-cal-swatch level-0"></i>
+              <i class="metrics-cal-swatch level-1"></i>
+              <i class="metrics-cal-swatch level-2"></i>
+              <i class="metrics-cal-swatch level-3"></i>
+              <i class="metrics-cal-swatch level-4"></i>
+              <span>Busy day</span>
+            </div>
+            <p class="metrics-cal-note">Tip: hover any day to see what finished and what did not.</p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/metrics.js') }}"></script>
+{% endblock %}

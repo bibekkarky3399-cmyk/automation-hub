@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block body_class %}page-runner{% endblock %}
+{% block title %}{{ pipeline.name }} — Helix{% endblock %}
+{% block content %}
+<div
+  id="runnerApp"
+  data-script-id="pipeline:{{ pipeline_id }}"
+  data-pipeline-id="{{ pipeline_id }}"
+  data-mode="pipeline"
+  data-current-user="{{ current_user }}"
+  class="desk-page fade-in"
+>
+  <div class="stepper runner-stepper mb-4" id="stepper" aria-label="Progress">
+    <div class="step runner-step active" data-step="1" aria-current="step">
+      <span class="runner-step-index">1</span>
+      <span class="runner-step-label">Configure</span>
+    </div>
+    <div class="runner-step-connector" aria-hidden="true"></div>
+    <div class="step runner-step" data-step="2">
+      <span class="runner-step-index">2</span>
+      <span class="runner-step-label">Run chain</span>
+    </div>
+    <div class="runner-step-connector" aria-hidden="true"></div>
+    <div class="step runner-step" data-step="3">
+      <span class="runner-step-index">3</span>
+      <span class="runner-step-label">Results</span>
+    </div>
+  </div>
+
+  <div id="panelConfigure" class="chain-configure">
+    <header class="chain-intro" aria-labelledby="chainTitle">
+      <div class="chain-intro-copy">
+        <nav class="desk-crumb mb-2" aria-label="Breadcrumb">
+          <a href="/workflows">Workflows</a>
+          <span aria-hidden="true">/</span>
+          <span>Chain</span>
+        </nav>
+        <p class="chain-intro-kicker">Workflow chain</p>
+        <h1 class="chain-intro-title" id="chainTitle">{{ pipeline.name }}</h1>
+        {% if pipeline.description %}
+        <p class="chain-intro-lead">{{ pipeline.description }}</p>
+        {% endif %}
+        {% if not pipeline.enabled %}
+        <span class="workflow-disabled-icon chain-intro-disabled-icon" title="Disabled" aria-label="Disabled">
+          <i class="bi bi-pause-circle-fill" aria-hidden="true"></i>
+        </span>
+        {% endif %}
+      </div>
+
+      {% if pipeline.steps %}
+      <ol class="chain-flow" aria-label="Steps in this chain">
+        {% for step in pipeline.steps %}
+        <li class="chain-flow-step{% if step.script_enabled is defined and not step.script_enabled %} is-blocked{% endif %}">
+          <span class="chain-flow-index" aria-hidden="true">{{ "%02d"|format(loop.index) }}</span>
+          <span class="chain-flow-label">{{ step.label or step.script_id }}</span>
+          {% if step.script_enabled is defined and not step.script_enabled %}
+          <span class="workflow-disabled-icon-inline" title="Disabled" aria-label="Disabled">
+            <i class="bi bi-pause-circle-fill" aria-hidden="true"></i>
+          </span>
+          {% endif %}
+        </li>
+        {% if not loop.last %}
+        <li class="chain-flow-join" aria-hidden="true">
+          <span class="chain-flow-arrow"></span>
+        </li>
+        {% endif %}
+        {% endfor %}
+      </ol>
+      {% endif %}
+    </header>
+
+    <section class="card runner-card border-0 chain-form-panel" aria-labelledby="chainFormTitle">
+      <div class="runner-body">
+        <div class="chain-form-heading">
+          <div>
+            <p class="chain-form-kicker">Inputs</p>
+            <h2 class="chain-form-title" id="chainFormTitle">Configure this run</h2>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="btnRestoreLast">
+            <i class="bi bi-clock-history me-1"></i>Use last settings
+          </button>
+        </div>
+        <div id="pathHintWrap" class="path-hint app-info mb-3 d-none"></div>
+        <div id="dynamicInputs" class="form-groups"></div>
+        <div class="runner-actions">
+          <button type="button" class="btn btn-lg runner-launch" id="btnRun" {% if not pipeline.enabled %}disabled{% endif %}>
+            <i class="bi bi-play-fill me-1"></i> Start chain
+          </button>
+          <a href="/workflows" class="btn btn-outline-secondary btn-lg">Back</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="panelRunning" class="d-none">
+    <div class="card runner-card border-0 mb-4">
+      <div class="card-body p-4 p-md-5">
+        <div class="text-center mb-4">
+          <h2 class="h5 fw-semibold mb-1" id="runningTitle">Running chain…</h2>
+          <p class="text-secondary mb-0" id="progressLabel">Starting…</p>
+        </div>
+
+        <div class="run-pipeline" id="runPipeline" aria-label="Pipeline steps"></div>
+        <p class="run-pipeline-empty text-secondary small text-center d-none mb-0 mt-2" id="runPipelineEmpty">
+          Tracking chain progress…
+        </p>
+
+        <div class="run-progress-wrap mx-auto mt-4 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="run-progress-caption" id="progressCaption">In progress</span>
+            <span class="run-progress-pct" id="progressPct">8%</span>
+          </div>
+          <div class="progress app-progress">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" id="runProgress" style="width: 8%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8"></div>
+          </div>
+        </div>
+
+        <div class="text-center mb-3 runner-live-tools justify-content-center">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnBackground">
+            <i class="bi bi-layout-sidebar-inset me-1"></i> Run in background
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="btnCancel">
+            <i class="bi bi-stop-circle me-1"></i> Cancel chain
+          </button>
+          <button type="button" class="btn btn-link btn-sm" id="btnToggleLog">Show log</button>
+        </div>
+        <p class="runner-background-hint text-secondary small text-center mb-0" id="backgroundHint">
+          Continue with other workflows — we’ll notify you when this chain finishes.
+        </p>
+
+        <pre class="log-console text-start d-none" id="liveLog" aria-live="polite"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div id="panelDone" class="d-none">
+    <div class="card runner-card border-0 mb-4 result-card success-card" id="resultSuccess">
+      <div class="card-body p-4 p-md-5">
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <div class="script-icon"><i class="bi bi-check-lg text-success fs-4"></i></div>
+          <div>
+            <h2 class="h4 mb-0 fw-semibold">Chain completed</h2>
+            <p class="text-secondary small mb-0" id="successSub">All steps finished.</p>
+          </div>
+        </div>
+        <dl class="row mb-0 summary-dl" id="summaryStats"></dl>
+      </div>
+    </div>
+    <div class="card runner-card border-0 mb-4 result-card d-none" id="resultError">
+      <div class="card-body p-4 p-md-5">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="script-icon"><i class="bi bi-x-lg text-danger fs-4"></i></div>
+          <div>
+            <h2 class="h4 mb-0 fw-semibold">Chain failed</h2>
+            <p class="text-secondary small mb-0" id="errorStageLabel"></p>
+          </div>
+        </div>
+        <p class="mb-3" id="errorMessage"></p>
+        <div class="run-pipeline mb-4" id="errorPipeline" aria-label="Failed pipeline steps"></div>
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+          <h3 class="h6 fw-semibold mb-0">Run log</h3>
+          <button type="button" class="btn btn-link btn-sm px-0" id="btnToggleErrorLog">Hide log</button>
+        </div>
+        <pre class="log-console text-start" id="errorLog"></pre>
+        <div class="runner-actions mt-4 pt-0 border-0">
+          <button type="button" class="btn runner-launch" id="btnRetryAfterError">Run again</button>
+          <a href="/workflows" class="btn btn-outline-secondary">Back to workflows</a>
+        </div>
+      </div>
+    </div>
+    <div class="card runner-card border-0 mb-4 d-none" id="reportPanel">
+      <div class="card-body p-4 p-md-5">
+        <h3 class="h5 fw-semibold mb-1 runner-panel-title">Your files</h3>
+        <p class="text-secondary small mb-3 report-panel-lead">Open a file, or download it</p>
+        <ul class="rd-file-list" id="outputFileList" aria-label="Generated files"></ul>
+        <div class="runner-actions mt-4 pt-0 border-0">
+          <button type="button" class="btn btn-outline-secondary" id="btnOpenFolder">
+            <i class="bi bi-folder2-open"></i> Output folder
+          </button>
+          <button type="button" class="btn runner-launch" id="btnRunAgain">
+            <i class="bi bi-arrow-repeat"></i> Run again
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade runner-confirm-modal" id="runnerConfirmModal" tabindex="-1" aria-labelledby="runnerConfirmTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 fw-semibold" id="runnerConfirmTitle">Ready to launch?</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="runner-confirm-lead">Double-check these settings, then launch.</p>
+        <dl class="runner-confirm-list" id="runnerConfirmList"></dl>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Go back</button>
+        <button type="button" class="btn runner-launch" id="btnConfirmLaunch">
+          <i class="bi bi-play-fill me-1" aria-hidden="true"></i> Launch
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade browse-modal" id="folderBrowseModal" tabindex="-1" aria-labelledby="folderBrowseLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 fw-semibold" id="folderBrowseLabel">Browse folders</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-secondary mb-3">Select a folder within the project directory.</p>
+        <div class="browse-path mb-3 user-select-all" id="browseCurrentPath"></div>
+        <div class="list-group list-group-flush border rounded browse-list" id="browseFolderList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="browseUpBtn">
+          <i class="bi bi-arrow-up"></i> Up
+        </button>
+        <button type="button" class="btn runner-launch" id="browseSelectBtn">Use this folder</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.RUNNER_PROJECT_ROOT = {{ project_root | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/runner.js') }}"></script>
+{% endblock %}

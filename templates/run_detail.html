@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block body_class %}page-home page-run-detail{% endblock %}
+{% block title %}{{ run.display_name or run.script_name or 'Run' }} — History — Helix{% endblock %}
+
+{% block content %}
+{% set result_ui = run.result_ui or {} %}
+{% set ui_mode = result_ui.get('mode') or 'run_summary' %}
+{% set ui_stats = result_ui.get('stats') or 'ocr' %}
+{% set ui_title = result_ui.get('title') or 'Files' %}
+{% set reuse_href =
+  ('/pipeline/' ~ run.script_id.split(':', 1)[1] ~ '?reuse=' ~ run.job_id)
+  if run.script_id and run.script_id.startswith('pipeline:')
+  else (('/runner/' ~ run.script_id ~ '?reuse=' ~ run.job_id) if run.script_id else '')
+%}
+{% set status = run.status_key or run.status or 'unknown' %}
+{% set outputs = run.outputs or [] %}
+{% set job_short = (run.job_id[:8] ~ '…') if run.job_id and run.job_id|length > 12 else (run.job_id or '—') %}
+
+<section class="run-detail fade-in" aria-labelledby="runDetailTitle">
+  <header class="rd-masthead">
+    <div class="rd-masthead-copy">
+      <nav class="rd-crumb" aria-label="Breadcrumb">
+        <a href="/history{% if run.script_id %}?workflow={{ run.script_id }}{% endif %}">History</a>
+        <span aria-hidden="true">/</span>
+        <span>{{ run.display_name or run.script_name or run.script_id }}</span>
+      </nav>
+
+      <div class="rd-heading">
+        <h1 id="runDetailTitle" class="rd-title">{{ run.display_name or run.script_name or run.script_id }}</h1>
+        <span class="rd-status rd-status-{{ status }}">{{ run.status_label or status }}</span>
+      </div>
+
+      {% if run.has_custom_run_name %}
+      <p class="rd-workflow-type">
+        <span class="rd-workflow-chip">{{ run.workflow_name or run.script_name }}</span>
+      </p>
+      {% endif %}
+
+      {% set biz = run.business or {} %}
+      {% if run.outcome_headline %}
+      <p class="rd-outcome">
+        <strong>{{ run.outcome_headline }}</strong>
+        {% if run.outcome_line %}<span>{{ run.outcome_line }}</span>{% endif %}
+      </p>
+      {% endif %}
+
+      <p class="rd-meta-line">
+        {% if run.started_by %}
+        <span>Started by {{ run.started_by }}</span>
+        {% endif %}
+        {% if run.day_label and run.time_label %}
+        <span title="{{ run.when_title or '' }}">{{ run.day_label }} · {{ run.time_label }}</span>
+        {% endif %}
+        {% if run.duration_label %}<span>{{ run.duration_label }}</span>{% endif %}
+        {% if ui_stats == 'collect' and run.rows_total is not none %}
+        <span>{{ run.rows_total }} row{% if run.rows_total != 1 %}s{% endif %} collected</span>
+        {% elif ui_stats == 'api' and (run.posted is not none or run.failed is not none) %}
+        <span>{{ run.posted or 0 }} posted</span>
+        <span>{{ run.failed or 0 }} failed</span>
+        {% elif ui_stats == 'booking' and (run.booked is not none or run.failed is not none) %}
+        <span>{{ run.booked or 0 }} booked</span>
+        <span>{{ run.failed or 0 }} failed</span>
+        {% elif ui_mode == 'per_source' %}
+        <span>{{ run.images_processed or 0 }} images</span>
+        {% endif %}
+        <span>{{ outputs|length }} file{% if outputs|length != 1 %}s{% endif %}</span>
+        <span class="rd-meta-id" title="{{ run.job_id }}">
+          <code>{{ job_short }}</code>
+          <button type="button" class="rd-copy" data-copy="{{ run.job_id }}" title="Copy reference">
+            <i class="bi bi-clipboard" aria-hidden="true"></i>
+            <span class="visually-hidden">Copy reference</span>
+          </button>
+        </span>
+      </p>
+    </div>
+
+    <div class="rd-actions">
+      {% if status == 'success' and outputs and outputs[0].download_url %}
+      <a href="{{ outputs[0].download_url }}" class="btn btn-sm btn-primary" download="{{ outputs[0].filename or 'output' }}">
+        <i class="bi bi-download" aria-hidden="true"></i> Download
+      </a>
+      {% endif %}
+      {% if reuse_href %}
+      <a href="{{ reuse_href }}" class="btn btn-sm rd-rerun">
+        <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Run again
+      </a>
+      {% endif %}
+      <a href="/history{% if run.script_id %}?workflow={{ run.script_id }}{% endif %}" class="btn btn-sm btn-outline-secondary">Back</a>
+    </div>
+  </header>
+
+  {% set bstats = biz.stats or {} %}
+  {% if status == 'success' and bstats.kind in ['ocr', 'pnr', 'api'] %}
+  <section class="rd-biz-summary" aria-label="Business summary">
+    <div class="rd-biz-grid">
+      {% if bstats.kind == 'ocr' %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Flight rows</span>
+        <strong class="rd-biz-value">{{ bstats.rows if bstats.rows is not none else '—' }}</strong>
+      </div>
+      {% if bstats.airline %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Airline</span>
+        <strong class="rd-biz-value rd-biz-value-text">{{ bstats.airline }}</strong>
+      </div>
+      {% endif %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">POB (A / C / I)</span>
+        <strong class="rd-biz-value rd-biz-value-text">{{ bstats.pob_adult or 0 }} / {{ bstats.pob_child or 0 }} / {{ bstats.pob_infant or 0 }}</strong>
+      </div>
+      <div class="rd-biz-card {% if bstats.needs_check %}is-alert{% endif %}">
+        <span class="rd-biz-kicker">Quality</span>
+        <strong class="rd-biz-value rd-biz-value-text">
+          {% if bstats.needs_check %}Needs check{% else %}Looks good{% endif %}
+        </strong>
+      </div>
+      {% elif bstats.kind == 'pnr' %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Booked</span>
+        <strong class="rd-biz-value">{{ bstats.booked if bstats.booked is not none else '—' }}</strong>
+      </div>
+      <div class="rd-biz-card {% if bstats.failed %}is-alert{% endif %}">
+        <span class="rd-biz-kicker">Failed</span>
+        <strong class="rd-biz-value">{{ bstats.failed or 0 }}</strong>
+      </div>
+      {% if bstats.sector %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Sector</span>
+        <strong class="rd-biz-value rd-biz-value-text">{{ bstats.sector }}</strong>
+      </div>
+      {% endif %}
+      {% if bstats.flight %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Flight</span>
+        <strong class="rd-biz-value rd-biz-value-text">{{ bstats.flight }}</strong>
+      </div>
+      {% endif %}
+      {% elif bstats.kind == 'api' %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Records</span>
+        <strong class="rd-biz-value">{{ bstats.rows if bstats.rows is not none else '—' }}</strong>
+      </div>
+      {% if bstats.mode %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Mode</span>
+        <strong class="rd-biz-value rd-biz-value-text">{{ bstats.mode }}</strong>
+      </div>
+      {% endif %}
+      {% if bstats.sector %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Sector</span>
+        <strong class="rd-biz-value rd-biz-value-text">{{ bstats.sector }}</strong>
+      </div>
+      {% endif %}
+      {% if bstats.agency %}
+      <div class="rd-biz-card">
+        <span class="rd-biz-kicker">Agency</span>
+        <strong class="rd-biz-value rd-biz-value-text">{{ bstats.agency }}</strong>
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if run.error_message or (run.recovery_tips and status in ['failed', 'cancelled', 'timeout']) %}
+  <div class="rd-alert" role="alert">
+    <strong>What went wrong</strong>
+    {% if run.error_message %}
+    <span>{{ run.error_message }}</span>
+    {% endif %}
+    {% if run.recovery_tips %}
+    <ul class="rd-recovery-tips">
+      {% for tip in run.recovery_tips %}
+      <li>{{ tip }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <div class="rd-recovery-actions">
+      {% if reuse_href %}
+      <a href="{{ reuse_href }}" class="btn btn-sm rd-rerun">
+        <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Edit &amp; run again
+      </a>
+      {% endif %}
+      {% if run.script_id and run.script_id.startswith('pipeline:') %}
+      <a href="/pipeline/{{ run.script_id.split(':', 1)[1] }}" class="btn btn-sm btn-outline-secondary">Open chain</a>
+      {% elif run.script_id %}
+      <a href="/runner/{{ run.script_id }}" class="btn btn-sm btn-outline-secondary">Open workflow</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% set param_rows = run.parameter_rows or [] %}
+  {% if param_rows %}
+  <details class="rd-settings" id="rdSettings">
+    <summary class="rd-settings-summary" title="Expand or collapse settings used">
+      <span class="rd-settings-title">Settings used <span class="rd-settings-count">{{ param_rows|length }}</span></span>
+      <span class="rd-settings-hint">Show</span>
+      <i class="bi bi-chevron-down rd-settings-chevron" aria-hidden="true"></i>
+    </summary>
+    <dl class="rd-kv">
+      {% for row in param_rows %}
+      <div class="rd-kv-row">
+        <dt title="{{ row.id }}">{{ row.label }}</dt>
+        <dd title="{{ row.value }}">{{ row.value }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+  </details>
+  {% endif %}
+
+  <section class="rd-files" aria-labelledby="rdFilesTitle">
+    <div class="rd-result-head">
+      <h2 id="rdFilesTitle" class="rd-panel-title">
+        {% if status == 'success' and bstats.kind == 'ocr' %}Passenger list
+        {% elif status == 'success' and bstats.kind == 'pnr' %}Booking results
+        {% elif status == 'success' and bstats.kind == 'api' %}Extract files
+        {% else %}{{ ui_title }}{% endif %}
+      </h2>
+      <p class="rd-panel-sub">
+        {% if outputs %}Download first — open in a new tab if you need to check rows{% else %}No files saved{% endif %}
+      </p>
+    </div>
+
+    {% if outputs %}
+    <ul class="rd-file-list">
+      {% for item in outputs %}
+      <li class="rd-file-item">
+        <a
+          class="rd-file-open"
+          href="{{ item.view_url or item.download_url }}"
+          target="_blank"
+          rel="noopener"
+          title="Open {{ item.label or item.filename }}"
+        >
+          <span class="rd-file-icon" aria-hidden="true">
+            <i class="bi bi-file-earmark-text"></i>
+          </span>
+          <span class="rd-file-copy">
+            <span class="rd-file-name">{{ item.label or item.filename or 'File' }}</span>
+            <span class="rd-file-meta">
+              {% if item.filename and item.label and item.filename != item.label %}
+              {{ item.filename }}
+              {% endif %}
+              {% if item.rows is not none %}
+              {% if item.filename and item.label and item.filename != item.label %} · {% endif %}
+              {{ item.rows }} row{% if item.rows != 1 %}s{% endif %}
+              {% elif not (item.filename and item.label and item.filename != item.label) %}
+              Open in a new tab
+              {% endif %}
+            </span>
+          </span>
+        </a>
+        <a
+          class="rd-file-download"
+          href="{{ item.download_url }}"
+          download="{{ item.filename or 'output' }}"
+          title="Download {{ item.label or item.filename }}"
+        >
+          Download
+          <i class="bi bi-download" aria-hidden="true"></i>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="rd-empty-note mb-0">This run didn’t leave a file to download.</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const text = btn.getAttribute("data-copy") || "";
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.classList.add("is-copied");
+        window.setTimeout(() => btn.classList.remove("is-copied"), 1200);
+      } catch (_) {}
+    });
+  });
+
+  const settings = document.getElementById("rdSettings");
+  const hint = settings?.querySelector(".rd-settings-hint");
+  if (settings && hint) {
+    const sync = () => {
+      hint.textContent = settings.open ? "Hide" : "Show";
+    };
+    sync();
+    settings.addEventListener("toggle", sync);
+  }
+});
+</script>
+{% endblock %}

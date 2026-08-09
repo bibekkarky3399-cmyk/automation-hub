@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block body_class %}page-settings{% endblock %}
+{% block title %}Settings — Helix{% endblock %}
+{% block content %}
+<div class="settings-page fade-in" id="settingsApp" data-config-path="{{ config_path }}">
+  <header class="settings-masthead">
+    <div>
+      <p class="settings-kicker">Configuration</p>
+      <h1 class="settings-title">Settings</h1>
+      <p class="settings-lead">
+        Enable workflows, edit details, and assemble pipelines on a visual canvas. Changes save to
+        <code>{{ config_path }}</code> instantly — no app restart.
+        Run files go to the shared <code>output_dir</code> in that config.
+      </p>
+    </div>
+    <div class="settings-mast-actions">
+      <a
+        href="/api/settings/backup"
+        class="btn btn-outline-secondary btn-sm"
+        id="btnBackupAll"
+        title="Download client backup: history, outputs, config, and scripts"
+      >
+        <i class="bi bi-download me-1" aria-hidden="true"></i>Backup everything
+      </a>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReloadConfig">
+        <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reload
+      </button>
+    </div>
+  </header>
+
+  <div class="settings-tabs" role="tablist">
+    <button type="button" class="settings-tab is-active" data-tab="workflows" role="tab" aria-selected="true">Workflows</button>
+    <button type="button" class="settings-tab" data-tab="pipelines" role="tab" aria-selected="false">Pipelines</button>
+    <button type="button" class="settings-tab" data-tab="deleted" role="tab" aria-selected="false">Deleted</button>
+  </div>
+
+  <div class="settings-layout" data-panel="workflows">
+    <aside class="settings-list-pane">
+      <div class="settings-list-head">
+        <h2>Workflows</h2>
+        <button type="button" class="btn btn-sm settings-new-btn" id="btnNewWorkflow">
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> New
+        </button>
+      </div>
+      <div class="settings-list" id="workflowList" aria-label="Workflows"></div>
+    </aside>
+    <section class="settings-editor-pane" id="workflowEditor" aria-live="polite">
+      <div class="settings-empty">
+        <i class="bi bi-sliders" aria-hidden="true"></i>
+        <p>Select a workflow to edit, or create a new one.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="settings-layout settings-layout-pipelines d-none" data-panel="pipelines">
+    <aside class="settings-list-pane">
+      <div class="settings-list-head">
+        <h2>Pipelines</h2>
+        <button type="button" class="btn btn-sm settings-new-btn" id="btnNewPipeline">
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> New
+        </button>
+      </div>
+      <div class="settings-list" id="pipelineList" aria-label="Pipelines"></div>
+    </aside>
+    <section class="settings-editor-pane settings-editor-canvas" id="pipelineEditor" aria-live="polite">
+      <div class="settings-empty">
+        <i class="bi bi-diagram-3" aria-hidden="true"></i>
+        <p>Select a pipeline to open the flow canvas, or create a new chain.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="settings-layout d-none" data-panel="deleted">
+    <aside class="settings-list-pane">
+      <div class="settings-list-head">
+        <h2>Deleted</h2>
+      </div>
+      <p class="settings-list-empty mb-2">Backups kept when a workflow is deleted.</p>
+      <div class="settings-list" id="deletedList" aria-label="Deleted workflows"></div>
+    </aside>
+    <section class="settings-editor-pane" id="deletedEditor" aria-live="polite">
+      <div class="settings-empty">
+        <i class="bi bi-trash3" aria-hidden="true"></i>
+        <p>Select a deleted workflow to view details, restore, or purge.</p>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

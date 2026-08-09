@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Report — {{ script_name }}{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+    <li class="breadcrumb-item active">Report</li>
+  </ol>
+</nav>
+<div class="card shadow-sm border-0">
+  <div class="card-body p-4">
+    <h1 class="h4 mb-3">{{ script_name }} — Report</h1>
+    <iframe src="{{ report_url }}{% if '?' in report_url %}&{% else %}?{% endif %}embed=1" class="report-frame" title="Report"></iframe>
+    <div class="mt-3 d-flex flex-wrap gap-2">
+      <a href="{{ report_url }}" class="btn btn-outline-primary" target="_blank" rel="noopener">Open in browser</a>
+      <a href="/report/{{ job_id }}/download" class="btn btn-primary">Download</a>
+      <a href="/" class="btn btn-link">Workflows</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

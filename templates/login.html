@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Helix — start a job, follow its progress, and collect finished results in one place.">
+  <meta name="theme-color" content="#22222c">
+  <title>Sign in — Helix</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2314532d'/><path fill='%23ecfdf5' d='M15.2 6.2h1.6v2.2c2.9.3 5.2 2.7 5.2 5.7v1.1h1.5v2.2h-1.5v5.4c0 1.4-1.1 2.5-2.5 2.5h-1.1v1.7h-2.2v-1.7h-1.1c-1.4 0-2.5-1.1-2.5-2.5v-5.4H9.9v-2.2h1.5v-1.1c0-3 2.3-5.4 5.2-5.7V6.2zm-2.4 9.2c-.5 0-.9.4-.9.9s.4.9.9.9.9-.4.9-.9-.4-.9-.9-.9zm6.4 0c-.5 0-.9.4-.9.9s.4.9.9.9.9-.4.9-.9-.4-.9-.9-.9zM13.5 20h5v1.4c0 .3-.2.5-.5.5h-4c-.3 0-.5-.2-.5-.5V20z'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        if (sessionStorage.getItem("helixPageTransitAt")) {
+          document.documentElement.classList.add("helix-transit");
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class="gate-body{% if error %} gate-auth-open{% endif %}">
+  <div id="pageTransit" class="page-transit" hidden aria-hidden="true" role="status" aria-live="polite" aria-label="Loading">
+    <div class="page-transit-inner">
+      <div class="page-transit-rocket" aria-hidden="true">
+        <i class="bi bi-rocket-takeoff-fill"></i>
+        <span class="page-transit-flame"></span>
+        <span class="page-transit-trail"></span>
+      </div>
+      <p class="page-transit-label">Loading</p>
+    </div>
+  </div>
+  <div class="gate-atmosphere" aria-hidden="true">
+    <div class="gate-glow gate-glow-a"></div>
+    <div class="gate-glow gate-glow-b"></div>
+    <div class="gate-grid"></div>
+  </div>
+
+  <header class="gate-top">
+    <div class="gate-top-inner">
+      <div class="gate-brand-lockup">
+        <span class="gate-top-mark brand-mark" aria-hidden="true">
+          <i class="bi bi-robot"></i>
+        </span>
+        <span class="gate-brand-name">Helix</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="gate-main">
+    <section class="gate-shell gate-shell-solo" aria-labelledby="gateBrand">
+      <div class="gate-story gate-anim gate-anim-1">
+        <p class="gate-kicker">Your work, start to finish</p>
+        <h1 id="gateBrand" class="gate-brand">One place to start a job and see it through.</h1>
+        <p class="gate-lead">
+          Sign in to begin a task, follow how it is going, and collect the finished
+          results when they are ready — all in one simple desk.
+        </p>
+
+        <div class="gate-cta gate-anim gate-anim-2">
+          <button type="button" class="btn btn-primary gate-open-auth" id="gateOpenAuth" aria-haspopup="dialog" aria-controls="gateAuthModal">
+            Sign in
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+          </button>
+          <a class="btn btn-outline-light gate-flights-link" href="{{ url_for('flights_page') }}">
+            <i class="bi bi-airplane" aria-hidden="true"></i>
+            Search flights
+          </a>
+        </div>
+
+        <ul class="gate-points">
+          <li>
+            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+            <span>Run one task, or link several steps together in order</span>
+          </li>
+          <li>
+            <i class="bi bi-broadcast" aria-hidden="true"></i>
+            <span>See what is running now and what still needs your eye</span>
+          </li>
+          <li>
+            <i class="bi bi-journal-check" aria-hidden="true"></i>
+            <span>Look back at past work and reuse what already worked well</span>
+          </li>
+        </ul>
+
+        <div class="gate-orbit gate-anim gate-anim-3" aria-hidden="true">
+          <div class="gate-orbit-track">
+            <span class="gate-orbit-beam"></span>
+          </div>
+          <div class="gate-orbit-nodes">
+            <div class="gate-orbit-node" style="--i: 0">
+              <span class="gate-orbit-icon"><i class="bi bi-sliders"></i></span>
+              <span class="gate-orbit-label">Set up</span>
+            </div>
+            <div class="gate-orbit-node" style="--i: 1">
+              <span class="gate-orbit-icon"><i class="bi bi-lightning-charge"></i></span>
+              <span class="gate-orbit-label">Run</span>
+            </div>
+            <div class="gate-orbit-node" style="--i: 2">
+              <span class="gate-orbit-icon"><i class="bi bi-graph-up-arrow"></i></span>
+              <span class="gate-orbit-label">Track</span>
+            </div>
+            <div class="gate-orbit-node" style="--i: 3">
+              <span class="gate-orbit-icon"><i class="bi bi-box-arrow-down"></i></span>
+              <span class="gate-orbit-label">Get results</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div
+    class="gate-modal"
+    id="gateAuthModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="gateAuthTitle"
+    {% if not error %}hidden{% endif %}
+  >
+    <button type="button" class="gate-modal-backdrop" data-gate-close aria-label="Close sign in"></button>
+    <div class="gate-modal-dialog gate-auth-panel">
+      <button type="button" class="gate-modal-close" data-gate-close aria-label="Close">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+      </button>
+      <form method="post" action="{{ url_for('login') }}" autocomplete="on" class="gate-auth-form">
+        <input type="hidden" name="next" value="{{ next or '/' }}">
+        <div class="gate-auth-head">
+          <h2 id="gateAuthTitle" class="gate-auth-title">Sign in</h2>
+          <p class="gate-auth-help">Use your admin or operator account to continue.</p>
+        </div>
+
+        {% if error %}
+        <div class="gate-auth-error" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <label class="gate-field">
+          <span class="gate-field-label">Username</span>
+          <input
+            class="form-control form-control-app"
+            type="text"
+            name="username"
+            id="username"
+            value="{{ username or '' }}"
+            autocomplete="username"
+            required
+          >
+        </label>
+
+        <label class="gate-field">
+          <span class="gate-field-label">Password</span>
+          <input
+            class="form-control form-control-app"
+            type="password"
+            name="password"
+            id="password"
+            autocomplete="current-password"
+            required
+          >
+        </label>
+
+        <button type="submit" class="btn btn-primary gate-submit">
+          Continue
+          <i class="bi bi-arrow-right" aria-hidden="true"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const body = document.body;
+      const modal = document.getElementById("gateAuthModal");
+      const username = document.getElementById("username");
+      if (!modal) return;
+
+      const openers = document.querySelectorAll(".gate-open-auth");
+      const closers = modal.querySelectorAll("[data-gate-close]");
+      let lastFocus = null;
+
+      function openModal() {
+        lastFocus = document.activeElement;
+        modal.hidden = false;
+        body.classList.add("gate-auth-open");
+        requestAnimationFrame(function () {
+          modal.classList.add("is-visible");
+          if (username) username.focus();
+        });
+      }
+
+      function closeModal() {
+        modal.classList.remove("is-visible");
+        body.classList.remove("gate-auth-open");
+        window.setTimeout(function () {
+          if (!modal.classList.contains("is-visible")) {
+            modal.hidden = true;
+          }
+        }, 220);
+        if (lastFocus && typeof lastFocus.focus === "function") {
+          lastFocus.focus();
+        }
+      }
+
+      openers.forEach(function (btn) {
+        btn.addEventListener("click", openModal);
+      });
+      closers.forEach(function (btn) {
+        btn.addEventListener("click", closeModal);
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && body.classList.contains("gate-auth-open")) {
+          closeModal();
+        }
+      });
+
+      if (body.classList.contains("gate-auth-open")) {
+        modal.hidden = false;
+        requestAnimationFrame(function () {
+          modal.classList.add("is-visible");
+          if (username) username.focus();
+        });
+      }
+    })();
+  </script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

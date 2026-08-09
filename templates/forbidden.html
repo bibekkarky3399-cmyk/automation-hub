@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block body_class %}page-home{% endblock %}
+{% block title %}Access restricted — Helix{% endblock %}
+
+{% block content %}
+<section class="runs-empty fade-in" style="margin-top: 2rem;">
+  <div class="runs-empty-visual" aria-hidden="true">
+    <i class="bi bi-shield-lock"></i>
+  </div>
+  <h1 class="runs-empty-title">Admin only</h1>
+  <p class="runs-empty-copy">
+    You’re signed in as <strong>{{ current_user or 'operator' }}</strong>
+    ({{ current_role or 'operator' }}). Settings and configuration changes need an admin account.
+  </p>
+  <div class="runs-empty-actions">
+    <a href="/" class="btn btn-primary">Back to Today</a>
+    <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary">Sign in as admin</a>
+  </div>
+</section>
+{% endblock %}

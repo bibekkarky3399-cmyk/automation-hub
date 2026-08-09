@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block body_class %}page-home page-jobs{% endblock %}
+{% block title %}Active jobs — Helix{% endblock %}
+
+{% block content %}
+<section
+  class="jobs-page fade-in"
+  aria-labelledby="jobsTitle"
+  id="jobsApp"
+  data-current-user="{{ current_user }}"
+>
+  <header class="jobs-masthead">
+    <div class="jobs-masthead-copy">
+      <nav class="runs-crumb" aria-label="Breadcrumb">
+        <a href="/">Today</a>
+        <span aria-hidden="true">/</span>
+        <a href="/workflows">Workflows</a>
+        <span aria-hidden="true">/</span>
+        <span>Active jobs</span>
+      </nav>
+      <h1 id="jobsTitle" class="jobs-title">Active jobs</h1>
+      <p class="jobs-lead">
+        Queued and running work right now. Anyone can watch status and settings; only the person who started a job can stop it.
+      </p>
+      <div class="jobs-masthead-meta">
+        <span class="runs-meta-pill" id="jobsCountPill">Checking…</span>
+        <span class="jobs-refresh-hint" id="jobsRefreshHint">Updates every few seconds</span>
+      </div>
+    </div>
+    <div class="jobs-masthead-actions">
+      <a href="/history" class="btn btn-sm btn-outline-secondary">History</a>
+      <a href="/workflows" class="btn btn-sm btn-primary">Start a job</a>
+    </div>
+  </header>
+
+  <div id="jobsList" class="jobs-list" aria-live="polite"></div>
+
+  <div id="jobsEmpty" class="jobs-empty d-none">
+    <div class="runs-empty-visual" aria-hidden="true">
+      <i class="bi bi-activity"></i>
+    </div>
+    <h2 class="runs-empty-title">Nothing running</h2>
+    <p class="runs-empty-copy">When a workflow or chain is queued or working, it shows up here so you can reopen the live view after a refresh.</p>
+    <div class="runs-empty-actions">
+      <a href="/workflows" class="btn btn-primary">Browse workflows</a>
+      <a href="/history" class="btn btn-outline-secondary">Open history</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/jobs.js') }}"></script>
+{% endblock %}

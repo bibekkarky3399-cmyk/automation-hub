@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local/automation-hub/scripts.schema.json",
+  "title": "Helix scripts.json",
+  "type": "object",
+  "required": ["schema_version", "python", "scripts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(\\.\\d+)?$"
+    },
+    "python": { "type": "string", "minLength": 1 },
+    "_comment_python": {
+      "type": "string",
+      "description": "Human note for which python path to use per OS. Ignored at runtime."
+    },
+    "output_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Shared folder for all workflow CSV/UUID outputs (relative to project root)."
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_concurrent_jobs": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "default_timeout_seconds": { "type": "integer", "minimum": 30 },
+        "max_image_bytes": { "type": "integer", "minimum": 1024 }
+      }
+    },
+    "notifications": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "webhook_url": { "type": ["string", "null"] },
+        "on_success": { "type": "boolean" },
+        "on_failure": { "type": "boolean" }
+      }
+    },
+    "scripts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/script" }
+    },
+    "pipelines": {
+      "type": "array",
+      "description": "Configurable multi-step workflow chains. Defined in-project in this file.",
+      "items": { "$ref": "#/$defs/pipeline" }
+    }
+  },
+  "$defs": {
+    "pipeline": {
+      "type": "object",
+      "required": ["id", "name", "enabled", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "badge": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "form_note": { "type": "string" },
+        "timeout_seconds": { "type": "integer", "minimum": 30 },
+        "inputs": {
+          "type": "array",
+          "description": "Optional chain-only extra fields. Step forms are pulled automatically from each step script_id.",
+          "items": { "$ref": "#/$defs/input" }
+        },
+        "inputs_exclude": {
+          "type": "array",
+          "description": "Input ids to omit from the composed pipeline form.",
+          "items": { "type": "string" }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/pipeline_step" }
+        }
+      }
+    },
+    "pipeline_step": {
+      "type": "object",
+      "required": ["id", "script_id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "script_id": { "type": "string" },
+        "label": { "type": "string" },
+        "hide_inputs": {
+          "type": "array",
+          "description": "Script input ids to hide from the pipeline form for this step (usually because bind supplies them).",
+          "items": { "type": "string" }
+        },
+        "bind": {
+          "type": "object",
+          "description": "Overrides only. Same-named form fields auto-map. Use const / steps.X.field for chain wiring.",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["const"],
+                "properties": { "const": {} },
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    "script": {
+      "type": "object",
+      "required": ["id", "name", "script", "enabled", "inputs"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "badge": { "type": "string" },
+        "script": { "type": "string", "minLength": 1 },
+        "cwd": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "timeout_seconds": { "type": "integer", "minimum": 30 },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/input" }
+        },
+        "progress_hints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["match", "label"],
+            "properties": {
+              "match": { "type": "string" },
+              "label": { "type": "string" }
+            }
+          }
+        },
+        "report": {
+          "type": ["object", "null"],
+          "properties": {
+            "stdout_line_prefix": { "type": "string" },
+            "search_dir": { "type": "string" },
+            "glob": { "type": "string" },
+            "pick": { "type": "string" },
+            "result_ui": {
+              "type": "object",
+              "description": "How the hub presents outputs after a run. per_source = OCR-style multi-file picker; run_summary = single results CSV + outcome stats.",
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": ["per_source", "run_summary"]
+                },
+                "title": { "type": "string" },
+                "lead": { "type": "string" },
+                "stats": {
+                  "type": "string",
+                  "enum": ["ocr", "booking", "api", "collect"],
+                  "description": "Which summary metrics to emphasize in the result panel. collect = rows pulled into a CSV."
+                }
+              }
+            }
+          }
+        },
+        "summary_patterns": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "form_note": {
+          "type": "string",
+          "description": "Optional hint shown on the runner form (relative path examples only; no machine-specific paths)."
+        },
+        "fixed_args": {
+          "type": "array",
+          "description": "CLI args always appended when launching. Output folder comes from top-level output_dir — do not pass --output here.",
+          "items": { "type": "string" }
+        },
+        "stages": {
+          "type": "array",
+          "description": "Optional live run pipeline stages. If omitted, progress_hints are used; if both are empty, a simple progress bar is shown.",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "match": { "type": "string" }
+            }
+          }
+        },
+        "summary_keys": {
+          "type": "array",
+          "description": "Parameter ids highlighted in history cards.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["id", "label", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["text", "select", "file", "folder", "boolean"]
+        },
+        "required": { "type": "boolean" },
+        "help": { "type": "string" },
+        "default": {},
+        "group": {
+          "type": "string",
+          "description": "Form section title for grouping related fields."
+        },
+        "advanced": {
+          "type": "boolean",
+          "description": "When true, field is shown under Advanced options."
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "When true, field is omitted from the runner form but still sent from its default (or env) via the job CLI."
+        },
+        "show_when": {
+          "type": "object",
+          "description": "Show this field only when another field matches. Keys are input ids; values are allowed strings (or arrays of strings).",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          }
+        },
+        "collapsed": {
+          "type": "boolean",
+          "description": "When true, the field's group starts collapsed (for optional / advanced sections)."
+        },
+        "input_type": {
+          "type": "string",
+          "description": "HTML input type for text fields (text, password, date, number)."
+        },
+        "width": {
+          "type": "string",
+          "enum": ["half", "full"],
+          "description": "Form layout width. half = two fields per row; full = one field per row."
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["value", "label"],
+                "properties": {
+                  "value": { "type": "string" },
+                  "label": { "type": "string" }
+                }
+              }
+            ]
+          }
+        },
+        "accept": { "type": "string" },
+        "require_images": { "type": "boolean" },
+        "create_if_missing": { "type": "boolean" },
+        "placeholder": { "type": "string" },
+        "pattern": { "type": "string" },
+        "cli": {
+          "type": "object",
+          "properties": {
+            "flag": { "type": ["string", "null"] },
+            "position": { "type": ["integer", "null"] },
+            "is_switch": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}
