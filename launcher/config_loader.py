@@ -26,7 +26,7 @@ def _repair_scripts_json_windows_escapes(raw: str) -> str | None:
     """Fix common Windows path mistakes that make scripts.json invalid JSON.
 
     Writing `"python": ".venv\\Scripts\\python.exe"` with single backslashes
-    yields JSON `Invalid \\escape` (e.g. `\\S`) and breaks public flights.
+    yields JSON `Invalid \\escape` (e.g. `\\S`) and breaks config load.
     Prefer forward slashes, which Windows Python accepts.
     """
     repaired = raw

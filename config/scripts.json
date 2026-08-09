@@ -37,7 +37,7 @@
         {
           "id": "write",
           "label": "Write CSV",
-          "match": "→ csv="
+          "match": "\u2192 csv="
         },
         {
           "id": "qc",
@@ -130,19 +130,19 @@
       "progress_hints": [
         {
           "match": "Processing:",
-          "label": "Reading images…"
+          "label": "Reading images\u2026"
         },
         {
-          "match": "→ csv=",
-          "label": "Writing CSV…"
+          "match": "\u2192 csv=",
+          "label": "Writing CSV\u2026"
         },
         {
           "match": "QC:",
-          "label": "Quality check…"
+          "label": "Quality check\u2026"
         },
         {
           "match": "CSV:",
-          "label": "Finalizing…"
+          "label": "Finalizing\u2026"
         },
         {
           "match": "Done:",
@@ -169,7 +169,7 @@
     },
     {
       "id": "pnr",
-      "name": "PNR — Yeti B2B booking",
+      "name": "PNR \u2014 Yeti B2B booking",
       "description": "Book group seats on Yeti Airlines and collect the booking codes.",
       "icon": "bi-airplane",
       "badge": "Active",
@@ -230,31 +230,31 @@
           "options": [
             {
               "value": "KTM",
-              "label": "KTM — Kathmandu"
+              "label": "KTM \u2014 Kathmandu"
             },
             {
               "value": "BIR",
-              "label": "BIR — Biratnagar"
+              "label": "BIR \u2014 Biratnagar"
             },
             {
               "value": "BDP",
-              "label": "BDP — Bhadrapur"
+              "label": "BDP \u2014 Bhadrapur"
             },
             {
               "value": "BWA",
-              "label": "BWA — Bhairahawa"
+              "label": "BWA \u2014 Bhairahawa"
             },
             {
               "value": "JKR",
-              "label": "JKR — Janakpur"
+              "label": "JKR \u2014 Janakpur"
             },
             {
               "value": "KEP",
-              "label": "KEP — Nepalgunj"
+              "label": "KEP \u2014 Nepalgunj"
             },
             {
               "value": "PKR",
-              "label": "PKR — Pokhara"
+              "label": "PKR \u2014 Pokhara"
             }
           ],
           "cli": {
@@ -274,35 +274,35 @@
           "options": [
             {
               "value": "BIR",
-              "label": "BIR — Biratnagar"
+              "label": "BIR \u2014 Biratnagar"
             },
             {
               "value": "KTM",
-              "label": "KTM — Kathmandu"
+              "label": "KTM \u2014 Kathmandu"
             },
             {
               "value": "BDP",
-              "label": "BDP — Bhadrapur"
+              "label": "BDP \u2014 Bhadrapur"
             },
             {
               "value": "BWA",
-              "label": "BWA — Bhairahawa"
+              "label": "BWA \u2014 Bhairahawa"
             },
             {
               "value": "JKR",
-              "label": "JKR — Janakpur"
+              "label": "JKR \u2014 Janakpur"
             },
             {
               "value": "KEP",
-              "label": "KEP — Nepalgunj"
+              "label": "KEP \u2014 Nepalgunj"
             },
             {
               "value": "PKR",
-              "label": "PKR — Pokhara"
+              "label": "PKR \u2014 Pokhara"
             },
             {
               "value": "TPU",
-              "label": "TPU — Tikapur"
+              "label": "TPU \u2014 Tikapur"
             }
           ],
           "cli": {
@@ -500,31 +500,31 @@
       "progress_hints": [
         {
           "match": "Logging in",
-          "label": "Logging in…"
+          "label": "Logging in\u2026"
         },
         {
           "match": "Searching",
-          "label": "Searching flights…"
+          "label": "Searching flights\u2026"
         },
         {
           "match": "Match:",
-          "label": "Selecting fare…"
+          "label": "Selecting fare\u2026"
         },
         {
           "match": "[advance",
-          "label": "Advancing booking…"
+          "label": "Advancing booking\u2026"
         },
         {
           "match": "Booking confirmed",
-          "label": "PNR confirmed…"
+          "label": "PNR confirmed\u2026"
         },
         {
           "match": "Writing CSV",
-          "label": "Writing CSV…"
+          "label": "Writing CSV\u2026"
         },
         {
           "match": "SUMMARY",
-          "label": "Summarizing…"
+          "label": "Summarizing\u2026"
         }
       ],
       "report": {
@@ -546,467 +546,8 @@
       }
     },
     {
-      "id": "booking_api",
-      "name": "United Solutions → CSV",
-      "description": "Download flight prices, sales, airport codes, or account balance from United Solutions into a spreadsheet.",
-      "icon": "bi-cloud-download",
-      "badge": "Active",
-      "script": "scripts/booking_api/main.py",
-      "cwd": ".",
-      "enabled": true,
-      "timeout_seconds": 1800,
-      "form_note": "Login is already set up for you. Choose what you need, check the open section, then press Start.",
-      "summary_keys": [
-        "mode",
-        "sector_from",
-        "sector_to"
-      ],
-      "stages": [
-        {
-          "id": "auth",
-          "label": "Authenticate",
-          "match": "Authenticating"
-        },
-        {
-          "id": "fetch",
-          "label": "Fetch data",
-          "match": "Calling"
-        },
-        {
-          "id": "export",
-          "label": "Write CSV",
-          "match": "Writing CSV"
-        },
-        {
-          "id": "done",
-          "label": "Summarize",
-          "match": "SUMMARY"
-        }
-      ],
-      "inputs": [
-        {
-          "id": "mode",
-          "label": "What do you need?",
-          "type": "select",
-          "required": true,
-          "default": "availability",
-          "group": "What do you need?",
-          "width": "full",
-          "help": "This chooses which spreadsheet to create. Other sections appear based on your choice.",
-          "options": [
-            {
-              "value": "availability",
-              "label": "Flight prices for a route & date"
-            },
-            {
-              "value": "sales",
-              "label": "Tickets sold in a date range"
-            },
-            {
-              "value": "sectors",
-              "label": "List of airport codes"
-            },
-            {
-              "value": "balance",
-              "label": "Agency account balance"
-            }
-          ],
-          "cli": {
-            "flag": "--mode",
-            "position": null
-          }
-        },
-        {
-          "id": "user_id",
-          "label": "User ID",
-          "type": "text",
-          "required": false,
-          "hidden": true,
-          "default": "TSTAPI",
-          "group": "API connection",
-          "help": "Edit in Settings. Hidden on the run form.",
-          "cli": {
-            "flag": "--user-id",
-            "position": null
-          }
-        },
-        {
-          "id": "password",
-          "label": "Password",
-          "type": "text",
-          "input_type": "password",
-          "required": false,
-          "hidden": true,
-          "default": "PASSWORD",
-          "group": "API connection",
-          "help": "Edit in Settings. Hidden on the run form.",
-          "cli": {
-            "flag": "--password",
-            "position": null
-          }
-        },
-        {
-          "id": "agency_id",
-          "label": "Agency ID",
-          "type": "text",
-          "required": false,
-          "hidden": true,
-          "default": "PLZ178",
-          "group": "API connection",
-          "help": "Edit in Settings. Hidden on the run form.",
-          "cli": {
-            "flag": "--agency-id",
-            "position": null
-          }
-        },
-        {
-          "id": "client_ip",
-          "label": "Client IP / marker",
-          "type": "text",
-          "required": false,
-          "hidden": true,
-          "default": "TSTAPI",
-          "group": "API connection",
-          "help": "Edit in Settings. Sandbox often accepts the user id.",
-          "cli": {
-            "flag": "--client-ip",
-            "position": null
-          }
-        },
-        {
-          "id": "endpoint",
-          "label": "SOAP endpoint",
-          "type": "text",
-          "required": false,
-          "hidden": true,
-          "default": "http://dev.usbooking.org/us/UnitedSolutions",
-          "group": "API connection",
-          "help": "Edit in Settings. SOAP service URL (not ?wsdl).",
-          "cli": {
-            "flag": "--endpoint",
-            "position": null
-          }
-        },
-        {
-          "id": "timeout",
-          "label": "Request timeout (sec)",
-          "type": "text",
-          "input_type": "number",
-          "required": false,
-          "hidden": true,
-          "default": "90",
-          "group": "API connection",
-          "help": "Edit in Settings. Per SOAP call timeout in seconds.",
-          "cli": {
-            "flag": "--timeout",
-            "position": null
-          }
-        },
-        {
-          "id": "sector_from",
-          "label": "From city",
-          "type": "text",
-          "required": false,
-          "default": "KTM",
-          "placeholder": "KTM",
-          "group": "Flight search",
-          "width": "half",
-          "help": "Airport code, e.g. KTM for Kathmandu.",
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "cli": {
-            "flag": "--sector-from",
-            "position": null
-          }
-        },
-        {
-          "id": "sector_to",
-          "label": "To city",
-          "type": "text",
-          "required": false,
-          "default": "BDP",
-          "placeholder": "BDP",
-          "group": "Flight search",
-          "width": "half",
-          "help": "Airport code, e.g. BDP for Bhadrapur.",
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "cli": {
-            "flag": "--sector-to",
-            "position": null
-          }
-        },
-        {
-          "id": "flight_date",
-          "label": "Travel date",
-          "type": "text",
-          "input_type": "date",
-          "required": false,
-          "default": "2026-08-10",
-          "group": "Flight search",
-          "width": "half",
-          "help": "Pick the departure day from the calendar.",
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "cli": {
-            "flag": "--flight-date",
-            "position": null
-          }
-        },
-        {
-          "id": "trip_type",
-          "label": "Trip type",
-          "type": "select",
-          "required": false,
-          "default": "O",
-          "group": "Flight search",
-          "width": "half",
-          "help": "One way, or round trip (then set a return date).",
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "options": [
-            {
-              "value": "O",
-              "label": "One way"
-            },
-            {
-              "value": "R",
-              "label": "Round trip"
-            }
-          ],
-          "cli": {
-            "flag": "--trip-type",
-            "position": null
-          }
-        },
-        {
-          "id": "return_date",
-          "label": "Return date",
-          "type": "text",
-          "input_type": "date",
-          "required": false,
-          "default": "",
-          "group": "Flight search",
-          "width": "half",
-          "help": "Only needed for round trip.",
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "cli": {
-            "flag": "--return-date",
-            "position": null
-          }
-        },
-        {
-          "id": "nationality",
-          "label": "Passenger nationality",
-          "type": "text",
-          "required": false,
-          "default": "NP",
-          "placeholder": "NP",
-          "group": "Passenger details",
-          "width": "half",
-          "help": "Two-letter country code. NP = Nepal.",
-          "collapsed": true,
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "cli": {
-            "flag": "--nationality",
-            "position": null
-          }
-        },
-        {
-          "id": "adults",
-          "label": "Adults",
-          "type": "text",
-          "input_type": "number",
-          "required": false,
-          "default": "1",
-          "placeholder": "1",
-          "group": "Passenger details",
-          "width": "half",
-          "help": "How many adult travellers.",
-          "collapsed": true,
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "cli": {
-            "flag": "--adults",
-            "position": null
-          }
-        },
-        {
-          "id": "children",
-          "label": "Children",
-          "type": "text",
-          "input_type": "number",
-          "required": false,
-          "default": "0",
-          "placeholder": "0",
-          "group": "Passenger details",
-          "width": "half",
-          "help": "How many child travellers.",
-          "collapsed": true,
-          "show_when": {
-            "mode": [
-              "availability"
-            ]
-          },
-          "cli": {
-            "flag": "--children",
-            "position": null
-          }
-        },
-        {
-          "id": "from_date",
-          "label": "From date",
-          "type": "text",
-          "input_type": "date",
-          "required": false,
-          "default": "2024-01-01",
-          "group": "Sales dates",
-          "width": "half",
-          "help": "Start of the sales period.",
-          "show_when": {
-            "mode": [
-              "sales"
-            ]
-          },
-          "cli": {
-            "flag": "--from-date",
-            "position": null
-          }
-        },
-        {
-          "id": "to_date",
-          "label": "To date",
-          "type": "text",
-          "input_type": "date",
-          "required": false,
-          "default": "2024-12-31",
-          "group": "Sales dates",
-          "width": "half",
-          "help": "End of the sales period.",
-          "show_when": {
-            "mode": [
-              "sales"
-            ]
-          },
-          "cli": {
-            "flag": "--to-date",
-            "position": null
-          }
-        },
-        {
-          "id": "airline_id",
-          "label": "Airline",
-          "type": "select",
-          "required": false,
-          "default": "ALL",
-          "group": "Balance check",
-          "width": "full",
-          "help": "Which airline wallet to check, or all of them.",
-          "show_when": {
-            "mode": [
-              "balance"
-            ]
-          },
-          "options": [
-            {
-              "value": "ALL",
-              "label": "All airlines"
-            },
-            {
-              "value": "U4",
-              "label": "Buddha Air"
-            },
-            {
-              "value": "YT",
-              "label": "Yeti Airlines"
-            },
-            {
-              "value": "S1",
-              "label": "Saurya Airlines"
-            },
-            {
-              "value": "SHA",
-              "label": "Shree Airlines"
-            },
-            {
-              "value": "RMK",
-              "label": "Simrik Airlines"
-            },
-            {
-              "value": "GA",
-              "label": "Goma Airlines"
-            },
-            {
-              "value": "ST",
-              "label": "Sita Air"
-            }
-          ],
-          "cli": {
-            "flag": "--airline-id",
-            "position": null
-          }
-        }
-      ],
-      "progress_hints": [
-        {
-          "match": "Authenticating",
-          "label": "Authenticating…"
-        },
-        {
-          "match": "Calling",
-          "label": "Fetching from API…"
-        },
-        {
-          "match": "Writing CSV",
-          "label": "Writing CSV…"
-        },
-        {
-          "match": "SUMMARY",
-          "label": "Summarizing…"
-        }
-      ],
-      "report": {
-        "stdout_line_prefix": "CSV:",
-        "glob": "*.csv",
-        "pick": "newest_after_start",
-        "result_ui": {
-          "mode": "run_summary",
-          "title": "Your spreadsheet",
-          "lead": "Data collected from United Solutions for this run.",
-          "stats": "collect"
-        }
-      },
-      "summary_patterns": {
-        "report_path": "CSV:\\s*(.+)",
-        "rows_total": "rows_total=(\\d+)"
-      }
-    },
-    {
       "id": "series_fare",
-      "name": "Series Fare — TBO API upload",
+      "name": "Series Fare \u2014 TBO API upload",
       "description": "Upload a PNR CSV to TBO via CheckMFA + addSeriesFare API.",
       "icon": "bi-cloud-upload",
       "badge": "Active",
@@ -1014,7 +555,7 @@
       "cwd": ".",
       "enabled": true,
       "timeout_seconds": 1800,
-      "form_note": "After OTP: paste TokenId (goes into body + Cookie pTokenId). Live POST uses browser-like Origin/Referer/Cookie. If Akamai blocks you, paste the full Cookie header from DevTools too.",
+      "form_note": "After OTP: paste TokenId and TraceId. HTTP headers (Origin, Referer, Cookie, User-Agent) are built by the script.",
       "summary_keys": [
         "limit",
         "dry_run"
@@ -1027,7 +568,7 @@
         },
         {
           "id": "map",
-          "label": "Map PNR → payload",
+          "label": "Map PNR \u2192 payload",
           "match": "Detected PNR CSV"
         },
         {
@@ -1057,7 +598,7 @@
           "label": "PNR results CSV (or Series Fare sheet)",
           "type": "file",
           "required": true,
-          "group": "1 · CSV",
+          "group": "1 \u00b7 CSV",
           "width": "full",
           "help": "PNR workflow CSV: status=booked + pnr. Grouped by route/flight/class into addSeriesFare calls.",
           "accept": ".csv,.xlsx,.xls",
@@ -1072,7 +613,7 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "group": "1 · CSV",
+          "group": "1 \u00b7 CSV",
           "width": "full",
           "help": "ON = writes series_fare_payload_N.json under outputs/. Nothing hits TBO.",
           "cli": {
@@ -1087,7 +628,7 @@
           "type": "text",
           "required": false,
           "default": "0",
-          "group": "1 · CSV",
+          "group": "1 \u00b7 CSV",
           "width": "half",
           "input_type": "number",
           "cli": {
@@ -1102,10 +643,10 @@
           "type": "text",
           "required": false,
           "default": "24",
-          "group": "1 · CSV",
+          "group": "1 \u00b7 CSV",
           "width": "half",
           "input_type": "number",
-          "help": "Not in the CSV — applied to every DayAllocation row as DisableBeforeDept.",
+          "help": "Not in the CSV \u2014 applied to every DayAllocation row as DisableBeforeDept.",
           "cli": {
             "flag": "--disable-before-hrs",
             "position": null
@@ -1117,9 +658,9 @@
           "type": "text",
           "required": false,
           "default": "",
-          "group": "2 · Auth from TBO UI",
+          "group": "2 \u00b7 Auth from TBO UI",
           "width": "full",
-          "placeholder": "eyJraWQiOiJ…",
+          "placeholder": "eyJraWQiOiJ\u2026",
           "help": "Paste after OTP. Used in practice run payload and live POST.",
           "cli": {
             "flag": "--token-id",
@@ -1132,7 +673,7 @@
           "type": "text",
           "required": false,
           "default": "",
-          "group": "2 · Auth from TBO UI",
+          "group": "2 \u00b7 Auth from TBO UI",
           "width": "full",
           "placeholder": "2e5fc0a3-1b2b-4889-afa5-da3666fbdbc9",
           "help": "Paste after OTP. Included in practice run payload and live POST.",
@@ -1140,95 +681,36 @@
             "flag": "--trace-id",
             "position": null
           }
-        },
-        {
-          "id": "agency_id",
-          "label": "AgencyId",
-          "type": "text",
-          "required": false,
-          "default": "73858",
-          "group": "2 · Auth from TBO UI",
-          "width": "half",
-          "help": "Also in the JWT / addSeriesFare body (TokenAgencyId).",
-          "cli": {
-            "flag": "--agency-id",
-            "position": null
-          }
-        },
-        {
-          "id": "member_id",
-          "label": "TokenMemberId",
-          "type": "text",
-          "required": false,
-          "default": "156197",
-          "group": "2 · Auth from TBO UI",
-          "width": "half",
-          "cli": {
-            "flag": "--member-id",
-            "position": null
-          }
-        },
-        {
-          "id": "cookie",
-          "label": "Browser Cookie header (optional)",
-          "type": "text",
-          "required": false,
-          "default": "",
-          "group": "2 · Auth from TBO UI",
-          "width": "full",
-          "placeholder": "agencyId=73858; memberId=156197; pTokenId=eyJ…; ak_bmsc=…",
-          "help": "Paste the full Cookie header from DevTools if live POST is blocked. TokenId / AgencyId / MemberId from the form still override auth keys.",
-          "advanced": true,
-          "collapsed": true,
-          "cli": {
-            "flag": "--cookie",
-            "position": null
-          }
-        },
-        {
-          "id": "session_file",
-          "label": "Saved token file",
-          "type": "text",
-          "required": false,
-          "default": ".tbo_api_session.json",
-          "group": "Advanced",
-          "width": "half",
-          "advanced": true,
-          "collapsed": true,
-          "cli": {
-            "flag": "--session-file",
-            "position": null
-          }
         }
       ],
       "progress_hints": [
         {
           "match": "Loading sheet:",
-          "label": "Reading CSV…"
+          "label": "Reading CSV\u2026"
         },
         {
           "match": "Detected PNR CSV",
-          "label": "Mapping PNR → API payload…"
+          "label": "Mapping PNR \u2192 API payload\u2026"
         },
         {
           "match": "Auth:",
-          "label": "Authenticating…"
+          "label": "Authenticating\u2026"
         },
         {
           "match": "Row ",
-          "label": "Posting inventory…"
+          "label": "Posting inventory\u2026"
         },
         {
           "match": "Dry run",
-          "label": "Writing practice payload…"
+          "label": "Writing practice payload\u2026"
         },
         {
           "match": "Writing CSV",
-          "label": "Writing results…"
+          "label": "Writing results\u2026"
         },
         {
           "match": "SUMMARY",
-          "label": "Summarizing…"
+          "label": "Summarizing\u2026"
         }
       ],
       "report": {
@@ -1253,30 +735,8 @@
   ],
   "pipelines": [
     {
-      "id": "ocr_chain",
-      "name": "OCR → CSV chain",
-      "description": "Process image and also collect the information from United Solutions",
-      "icon": "bi-robot",
-      "badge": "Pipeline",
-      "enabled": true,
-      "timeout_seconds": 3600,
-      "form_note": "Starts with OCR → CSV. Open Settings → Pipelines to drag in more workflows.",
-      "steps": [
-        {
-          "id": "ocr",
-          "label": "Image Processor",
-          "script_id": "ocr"
-        },
-        {
-          "id": "booking_api",
-          "label": "United Solutions → CSV",
-          "script_id": "booking_api"
-        }
-      ]
-    },
-    {
       "id": "pnr_to_tbo",
-      "name": "PNR → TBO Series Fare (API)",
+      "name": "PNR \u2192 TBO Series Fare (API)",
       "description": "Book Yeti PNRs, then POST the CSV to TBO addSeriesFare.",
       "icon": "bi-diagram-3",
       "badge": "Pipeline",

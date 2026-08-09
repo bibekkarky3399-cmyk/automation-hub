@@ -43,6 +43,13 @@ BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
 )
+# Auth + Cookie defaults (built in Python — not form inputs).
+DEFAULT_AGENCY_ID = "73858"
+DEFAULT_MEMBER_ID = "156197"
+DEFAULT_FULL_NAME = "Yeti@BLRC498"
+DEFAULT_CLIENT_ID = "TBOINDIA"
+DEFAULT_PRODUCT_TYPE = "CAR"
+DEFAULT_SESSION_FILE = ".tbo_api_session.json"
 
 DEFAULT_FARE_RULE = (
     "This is a Series Fare booking and is Non-Refundable and Non-Changeable. "
@@ -70,33 +77,31 @@ class Config:
     limit: int
     token_id: str
     trace_id: str
-    agency_id: str
-    member_id: str
-    cookie: str
-    account_code: str
-    full_name: str
-    end_user_ip: str
-    add_url: str
-    session_file: str
-    airline_code: str
-    cabin_class: str
-    journey_type: str
-    dep_time: str
-    arr_time: str
-    duration: str
-    dep_terminal: str
-    arr_terminal: str
-    baggage: str
-    base_fare: str
-    taxes: str
-    agent_surcharge: str
-    fare_rules: str
-    disable_before_hrs: int
-    is_active: int
-    is_refundable: int
-    inventory_type: int
-    geo_type: str
-    is_lcc: str
+    agency_id: str = DEFAULT_AGENCY_ID
+    member_id: str = DEFAULT_MEMBER_ID
+    full_name: str = DEFAULT_FULL_NAME
+    end_user_ip: str = ""
+    add_url: str = ADD_SERIES_FARE_URL
+    session_file: str = DEFAULT_SESSION_FILE
+    airline_code: str = "YT"
+    cabin_class: str = "Economy"
+    journey_type: str = "One Way"
+    dep_time: str = ""
+    arr_time: str = ""
+    duration: str = ""
+    dep_terminal: str = ""
+    arr_terminal: str = ""
+    baggage: str = "20"
+    base_fare: str = ""
+    taxes: str = ""
+    agent_surcharge: str = "0"
+    fare_rules: str = ""
+    disable_before_hrs: int = 24
+    is_active: int = 1
+    is_refundable: int = 0
+    inventory_type: int = 1
+    geo_type: str = "0"
+    is_lcc: str = "0"
 
 
 @dataclass
@@ -110,6 +115,7 @@ class RowResult:
     travel_to: str = ""
     grn: str = ""
     status: str = "failed"
+    http_status: str = ""
     message: str = ""
 
 
@@ -633,34 +639,31 @@ def save_session(path: Path, data: dict) -> None:
 
 
 def authenticate(cfg: Config) -> tuple[str, str, str, str]:
-    """Return (token_id, agency_id, member_id, trace_id) from form or cache."""
+    """Return (token_id, agency_id, member_id, trace_id).
+
+    Agency/Member come from Python defaults; TokenId/TraceId from form or cache.
+    """
     session_path = Path(cfg.session_file).expanduser()
     token = cfg.token_id.strip()
-    agency = cfg.agency_id.strip()
-    member = cfg.member_id.strip()
+    agency = cfg.agency_id.strip() or DEFAULT_AGENCY_ID
+    member = cfg.member_id.strip() or DEFAULT_MEMBER_ID
     trace = cfg.trace_id.strip()
 
     cached = load_session(session_path)
     if not token:
         token = str(cached.get("TokenId") or "")
-    if not agency:
-        agency = str(cached.get("AgencyId") or "")
-    if not member:
-        member = str(cached.get("MemberId") or "")
     if not trace:
         trace = str(cached.get("TraceId") or "")
 
-    missing = [n for n, v in (
-        ("TokenId", token), ("AgencyId", agency), ("MemberId", member),
-    ) if not v]
-    if missing:
-        print("ERROR: after OTP in the TBO UI, paste "
-              + ", ".join(missing)
-              + " into the form (TraceId recommended too).")
+    if not token:
+        print("ERROR: after OTP in the TBO UI, paste TokenId into the form "
+              "(TraceId recommended too).")
         sys.exit(2)
 
     source = "form" if cfg.token_id.strip() else f"saved ({session_path.name})"
     print(f"Auth: TokenId from {source}")
+    print(f"  AgencyId/MemberId from script defaults "
+          f"({agency}/{member})")
     if trace:
         print(f"  TraceId: {trace[:36]}{'…' if len(trace) > 36 else ''}")
     else:
@@ -769,10 +772,8 @@ def build_payload(rec: InventoryRecord, cfg: Config,
     }
 
 
-def account_code_for(agency: str, override: str = "") -> str:
+def account_code_for(agency: str) -> str:
     """Working capture: agency 73858 → accountCode H3858."""
-    if override.strip():
-        return override.strip()
     digits = re.sub(r"\D", "", agency or "")
     if len(digits) >= 4:
         return "H" + digits[1:]
@@ -791,61 +792,36 @@ def parse_cookie_header(raw: str) -> dict[str, str]:
 
 
 def build_cookie_header(token: str, agency: str, member: str, end_user_ip: str,
-                        *, cookie_override: str = "", account_code: str = "",
-                        full_name: str = "") -> str:
-    """
-    Mirror the working Chrome Cookie header.
-
-    JWT is in ``pTokenId`` (``tokenId`` is empty in the capture).
-    If the operator pastes a full Cookie string from DevTools, we keep it and
-    overwrite the auth keys from the form so TokenId/Agency stay current.
-    """
+                        *, full_name: str = DEFAULT_FULL_NAME) -> str:
+    """Build the Cookie header in Python (not from the Helix form)."""
     ip = (end_user_ip or "").strip()
-    jar = parse_cookie_header(cookie_override)
-    # Form values win for the auth keys the UI just refreshed after OTP.
-    jar["agencyId"] = agency
-    jar["memberId"] = member
-    jar["tokenId"] = ""
-    jar["tokenAgencyId"] = agency
-    jar["tokenMemberId"] = member
+    jar = {
+        "agencyId": agency,
+        "memberId": member,
+        "tokenId": "",
+        "tokenAgencyId": agency,
+        "tokenMemberId": member,
+        "accountCode": account_code_for(agency),
+        "ProductType": DEFAULT_PRODUCT_TYPE,
+        "clientID": DEFAULT_CLIENT_ID,
+        "FullName": urlparse.quote((full_name or DEFAULT_FULL_NAME).strip(),
+                                   safe=""),
+        "clientIP": urlparse.quote(ip, safe="") if ip else "",
+    }
     if token:
         jar["pTokenId"] = token
-    jar["clientIP"] = urlparse.quote(ip, safe="") if ip else jar.get("clientIP", "")
-    ac = account_code_for(agency, account_code)
-    if ac:
-        jar["accountCode"] = ac
-    jar.setdefault("clientID", "TBOINDIA")
-    jar.setdefault("ProductType", "CAR")
-    if full_name.strip():
-        jar["FullName"] = urlparse.quote(full_name.strip(), safe="")
-    # Stable order close to the browser capture.
     order = [
         "agencyId", "memberId", "tokenId", "tokenAgencyId", "tokenMemberId",
-        "accountCode", "IPAddress", "ProductType", "clientID", "FullName",
-        "clientIP", "pTokenId",
+        "accountCode", "ProductType", "clientID", "FullName", "clientIP",
+        "pTokenId",
     ]
-    parts = []
-    seen = set()
-    for key in order:
-        if key in jar:
-            parts.append(f"{key}={jar[key]}")
-            seen.add(key)
-    for key, val in jar.items():
-        if key not in seen:
-            parts.append(f"{key}={val}")
-    return "; ".join(parts)
+    return "; ".join(f"{k}={jar[k]}" for k in order if k in jar)
 
 
 def tbo_browser_headers(token: str, agency: str, member: str,
-                        end_user_ip: str, *, cookie_override: str = "",
-                        account_code: str = "",
-                        full_name: str = "") -> dict[str, str]:
-    cookie = build_cookie_header(
-        token, agency, member, end_user_ip,
-        cookie_override=cookie_override,
-        account_code=account_code,
-        full_name=full_name,
-    )
+                        end_user_ip: str,
+                        *, full_name: str = DEFAULT_FULL_NAME) -> dict[str, str]:
+    """HTTP headers for addSeriesFare — always constructed in this file."""
     return {
         "Accept": "*/*",
         "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
@@ -853,20 +829,69 @@ def tbo_browser_headers(token: str, agency: str, member: str,
         "Origin": SERIES_FARE_ORIGIN,
         "Referer": f"{SERIES_FARE_ORIGIN}/",
         "User-Agent": BROWSER_UA,
-        "Cookie": cookie,
+        "Cookie": build_cookie_header(
+            token, agency, member, end_user_ip, full_name=full_name,
+        ),
     }
 
 
-def post_series_fare(cfg: Config, payload: dict) -> tuple[bool, str]:
+def api_history_path(out_dir: Path) -> Path:
+    return out_dir / "series_fare_api_history.json"
+
+
+def append_api_history(history_path: Path, index: int, *, url: str,
+                       payload: dict, code: int, resp: Any, ok: bool,
+                       headers: dict | None = None) -> Path:
+    """Append one addSeriesFare request/response to a shared history JSON."""
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    history: dict[str, Any] = {"calls": []}
+    if history_path.exists():
+        try:
+            loaded = json.loads(history_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict) and isinstance(loaded.get("calls"), list):
+                history = loaded
+            elif isinstance(loaded, list):
+                history = {"calls": loaded}
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    hdr_dump = None
+    if headers:
+        hdr_dump = dict(headers)
+        jar = parse_cookie_header(hdr_dump.get("Cookie", ""))
+        hdr_dump["Cookie"] = "; ".join(
+            f"{k}={'<jwt>' if k == 'pTokenId' and v else v}"
+            for k, v in jar.items()
+        )
+    ts = datetime.now().isoformat(timespec="seconds")
+    history.setdefault("calls", []).append({
+        "row": index,
+        "timestamp": ts,
+        "url": url,
+        "method": "POST",
+        "http_status": code,
+        "ok": ok,
+        "headers": hdr_dump,
+        "request": payload,
+        "response": resp,
+    })
+    history["updated_at"] = ts
+    history_path.write_text(
+        json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
+    return history_path
+
+
+def post_series_fare(
+    cfg: Config, payload: dict, *, history_path: Path, index: int,
+) -> tuple[bool, str, int]:
     headers = tbo_browser_headers(
         token=str(payload.get("TokenId") or cfg.token_id or ""),
         agency=str(payload.get("AgencyId") or payload.get("TokenAgencyId")
-                   or cfg.agency_id or ""),
-        member=str(payload.get("TokenMemberId") or cfg.member_id or ""),
+                   or cfg.agency_id or DEFAULT_AGENCY_ID),
+        member=str(payload.get("TokenMemberId") or cfg.member_id
+                   or DEFAULT_MEMBER_ID),
         end_user_ip=str(payload.get("EndUserIp") or cfg.end_user_ip or ""),
-        cookie_override=cfg.cookie,
-        account_code=cfg.account_code,
-        full_name=cfg.full_name,
+        full_name=cfg.full_name or DEFAULT_FULL_NAME,
     )
     has_p = "pTokenId=" in headers.get("Cookie", "") and \
         "pTokenId=;" not in headers.get("Cookie", "")
@@ -875,7 +900,11 @@ def post_series_fare(cfg: Config, payload: dict) -> tuple[bool, str]:
           f"agencyId={payload.get('AgencyId')})")
     code, resp = http_json("POST", cfg.add_url, payload, headers=headers)
     text = json.dumps(resp, ensure_ascii=False) if not isinstance(resp, str) \
-        else resp
+        else (resp or "")
+    print(f"    HTTP {code}")
+    preview = text if len(text) <= 500 else text[:500] + "…"
+    print(f"    Response: {preview or '(empty)'}")
+
     ok_flag = dig(resp, "IsSuccess", "isSuccess", "Success", "success", "Status")
     err = dig(resp, "Error", "error", "Message", "message", "ErrorMessage",
               "Errors", "errorMessage", "ResponseMessage")
@@ -885,20 +914,31 @@ def post_series_fare(cfg: Config, payload: dict) -> tuple[bool, str]:
             isinstance(resp.get("d"), (dict, str)) else None
         err = err or dig(resp.get("d"), "Error", "Message", "ErrorMessage")
 
-    if code >= 400:
-        return False, f"HTTP {code}: {text[:400]}"
-    if ok_flag in (False, "false", "False", 0, "0"):
-        return False, f"{err or text[:400]}"
-    if isinstance(err, str) and err and "success" not in err.lower():
-        if ok_flag is None and dig(resp, "Error", "error", "ErrorMessage"):
-            return False, err[:400]
-    # Explicit failure phrases even on HTTP 200
     low = text.lower() if isinstance(text, str) else ""
-    for bad in ("unauthorized", "not authenticated", "invalid token",
-                "session expired", "access denied"):
-        if bad in low and "success" not in low:
-            return False, text[:400]
-    return True, (str(err) if err else text)[:400] or f"HTTP {code} ok"
+    # 3xx → /ErrorPage is TBO rejecting the call (auth/WAF), not a success body.
+    if code >= 400 or 300 <= code < 400:
+        ok, msg = False, f"HTTP {code}: {text[:400]}"
+    elif "errorpage" in low or low.strip() in {"/errorpage", "errorpage"}:
+        ok, msg = False, f"HTTP {code}: {text[:400]}"
+    elif ok_flag in (False, "false", "False", 0, "0"):
+        ok, msg = False, f"{err or text[:400]}"
+    elif isinstance(err, str) and err and "success" not in err.lower() and \
+            ok_flag is None and dig(resp, "Error", "error", "ErrorMessage"):
+        ok, msg = False, err[:400]
+    else:
+        # Explicit failure phrases even on HTTP 200
+        ok, msg = True, (str(err) if err else text)[:400] or f"HTTP {code} ok"
+        for bad in ("unauthorized", "not authenticated", "invalid token",
+                    "session expired", "access denied"):
+            if bad in low and "success" not in low:
+                ok, msg = False, text[:400]
+                break
+
+    append_api_history(
+        history_path, index, url=cfg.add_url, payload=payload, code=code,
+        resp=resp, ok=ok, headers=headers,
+    )
+    return ok, msg, code
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -910,7 +950,8 @@ def write_results_csv(cfg: Config, results: list[RowResult]) -> Path:
     path = out_dir / f"{uuid.uuid4()}.csv"
     print(f"\nWriting CSV -> {path}")
     fields = ["row", "airline", "origin", "destination", "flight_no",
-              "travel_from", "travel_to", "grn", "status", "message"]
+              "travel_from", "travel_to", "grn", "status", "http_status",
+              "message"]
     with path.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
@@ -941,25 +982,22 @@ def run_upload(cfg: Config) -> int:
 
     cfg.end_user_ip = resolve_end_user_ip(cfg.end_user_ip)
 
-    # Always take TokenId / TraceId / AgencyId / MemberId from the form,
-    # including practice runs (so the payload JSON matches a live POST).
+    # TokenId / TraceId from form; Agency/Member/headers from Python defaults.
     token = cfg.token_id.strip()
-    agency = cfg.agency_id.strip()
-    member = cfg.member_id.strip()
+    agency = cfg.agency_id.strip() or DEFAULT_AGENCY_ID
+    member = cfg.member_id.strip() or DEFAULT_MEMBER_ID
     trace = cfg.trace_id.strip()
     if not cfg.dry_run:
         token, agency, member, trace = authenticate(cfg)
     else:
-        print("Auth: practice run — using form TokenId / TraceId (not posted)")
+        print("Auth: practice run — TokenId/TraceId from form; "
+              "headers built in script (not posted)")
         if not token:
             print("  WARNING: TokenId empty — paste it on the form to preview a real payload")
             token = "DRY_RUN_TOKEN"
         else:
             print(f"  TokenId: {token[:24]}… ({len(token)} chars)")
-        if not agency:
-            agency = "0"
-        if not member:
-            member = "0"
+        print(f"  AgencyId/MemberId: {agency}/{member} (script defaults)")
         if trace:
             print(f"  TraceId: {trace}")
         else:
@@ -967,6 +1005,9 @@ def run_upload(cfg: Config) -> int:
 
     results: list[RowResult] = []
     added = failed = 0
+    history_path = api_history_path(Path(cfg.output).expanduser())
+    if not cfg.dry_run:
+        print(f"  API history → {history_path}")
 
     for i, rec in enumerate(records, start=1):
         payload = build_payload(rec, cfg, token, agency, member, trace)
@@ -992,12 +1033,10 @@ def run_upload(cfg: Config) -> int:
             dump.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             headers = tbo_browser_headers(
                 token=str(payload.get("TokenId") or ""),
-                agency=str(payload.get("AgencyId") or ""),
-                member=str(payload.get("TokenMemberId") or ""),
+                agency=str(payload.get("AgencyId") or DEFAULT_AGENCY_ID),
+                member=str(payload.get("TokenMemberId") or DEFAULT_MEMBER_ID),
                 end_user_ip=str(payload.get("EndUserIp") or ""),
-                cookie_override=cfg.cookie,
-                account_code=cfg.account_code,
-                full_name=cfg.full_name,
+                full_name=cfg.full_name or DEFAULT_FULL_NAME,
             )
             # Don't dump the full JWT twice in headers file — show cookie keys.
             hdr_dump = dict(headers)
@@ -1014,7 +1053,10 @@ def run_upload(cfg: Config) -> int:
             added += 1
         else:
             print(f"    POST {cfg.add_url}")
-            ok, msg = post_series_fare(cfg, payload)
+            ok, msg, code = post_series_fare(
+                cfg, payload, history_path=history_path, index=i,
+            )
+            res.http_status = str(code)
             if ok:
                 print(f"    Added: {msg}")
                 res.status = "added"
@@ -1029,6 +1071,8 @@ def run_upload(cfg: Config) -> int:
 
     print("\nSUMMARY")
     print(f"  added={added} failed={failed}")
+    if not cfg.dry_run:
+        print(f"  API history → {history_path}")
     write_results_csv(cfg, results)
     print(f"SUMMARY: added={added} failed={failed} duplicates=0 recovered=0")
     return 0 if failed == 0 else 1
@@ -1047,23 +1091,23 @@ def parse_args() -> Config:
                    help="JWT from TBO UI after OTP")
     p.add_argument("--trace-id", default=os.environ.get("TBO_TRACE_ID", ""),
                    help="TraceId from TBO UI after OTP")
-    p.add_argument("--agency-id", default=os.environ.get("TBO_AGENCY_ID", ""))
-    p.add_argument("--member-id", default=os.environ.get("TBO_MEMBER_ID", ""))
-    p.add_argument("--cookie", default=os.environ.get("TBO_COOKIE", ""),
-                   help="Optional full Cookie header from DevTools (keeps ak_bmsc etc.)")
-    p.add_argument("--account-code", default="",
-                   help="Cookie accountCode (default H + agency without first digit)")
-    p.add_argument("--full-name", default="Yeti@BLRC498",
-                   help="Cookie FullName (login id)")
+    # Agency/Member/headers are script constants; CLI overrides optional only.
+    p.add_argument("--agency-id",
+                   default=os.environ.get("TBO_AGENCY_ID", DEFAULT_AGENCY_ID))
+    p.add_argument("--member-id",
+                   default=os.environ.get("TBO_MEMBER_ID", DEFAULT_MEMBER_ID))
+    p.add_argument("--full-name", default=DEFAULT_FULL_NAME)
     p.add_argument("--end-user-ip", default="",
                    help="Override EndUserIp; leave empty to auto-detect public IP")
     p.add_argument("--add-url", default=ADD_SERIES_FARE_URL)
-    # Ignored legacy flags (old Helix forms / CheckMFA)
+    # Ignored legacy flags (old Helix forms / CheckMFA / cookie paste)
+    p.add_argument("--cookie", default="")
+    p.add_argument("--account-code", default="")
     p.add_argument("--username", default="")
     p.add_argument("--password", default="")
     p.add_argument("--mfa-type", default="")
     p.add_argument("--check-mfa-url", default="")
-    p.add_argument("--session-file", default=".tbo_api_session.json")
+    p.add_argument("--session-file", default=DEFAULT_SESSION_FILE)
     p.add_argument("--airline-code", default="YT")
     p.add_argument("--cabin-class", default="Economy")
     p.add_argument("--journey-type", default="One Way")
@@ -1108,14 +1152,12 @@ def parse_args() -> Config:
         limit=parse_int(args.limit, 0),
         token_id=args.token_id.strip(),
         trace_id=args.trace_id.strip(),
-        agency_id=args.agency_id.strip(),
-        member_id=args.member_id.strip(),
-        cookie=args.cookie.strip(),
-        account_code=args.account_code.strip(),
-        full_name=args.full_name.strip(),
+        agency_id=args.agency_id.strip() or DEFAULT_AGENCY_ID,
+        member_id=args.member_id.strip() or DEFAULT_MEMBER_ID,
+        full_name=args.full_name.strip() or DEFAULT_FULL_NAME,
         end_user_ip=args.end_user_ip.strip(),
         add_url=args.add_url.strip() or ADD_SERIES_FARE_URL,
-        session_file=args.session_file.strip() or ".tbo_api_session.json",
+        session_file=args.session_file.strip() or DEFAULT_SESSION_FILE,
         airline_code=(args.airline_code or args.airline or "YT").strip() or "YT",
         cabin_class=args.cabin_class.strip() or "Economy",
         journey_type=args.journey_type.strip() or "One Way",

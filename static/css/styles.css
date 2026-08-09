@@ -751,17 +751,6 @@ body {
   gap: 0.65rem;
 }
 
-.gate-flights-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-weight: 600;
-  font-size: 1rem;
-  padding: 0.8rem 1.2rem;
-  border-radius: 0.7rem;
-  text-decoration: none;
-}
-
 .gate-open-auth.btn-primary {
   --bs-btn-color: #ffffff;
   --bs-btn-bg: transparent;

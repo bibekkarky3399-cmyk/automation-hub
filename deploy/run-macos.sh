@@ -49,6 +49,19 @@ venv_is_macos() {
   [[ -x "${VENV_PY}" || -x "${VENV_DIR}/bin/python" ]]
 }
 
+# True when bin/python exists but pip never finished installing (e.g. Ctrl+C mid-venv).
+venv_has_pip() {
+  local py=""
+  if [[ -x "${VENV_PY}" ]]; then
+    py="${VENV_PY}"
+  elif [[ -x "${VENV_DIR}/bin/python" ]]; then
+    py="${VENV_DIR}/bin/python"
+  else
+    return 1
+  fi
+  "${py}" -c "import pip" >/dev/null 2>&1
+}
+
 # Prefer versions with solid wheels for OCR/Paddle; fall back to python3.
 resolve_python() {
   local cand ver
@@ -90,7 +103,7 @@ if [[ -d "${VENV_DIR}" ]]; then
 fi
 echo "Caches cleared."
 
-# --- 2) Drop Windows (or forced) venv ---
+# --- 2) Drop Windows / broken / forced venv ---
 if [[ "${FRESH}" -eq 1 && -e "${VENV_DIR}" ]]; then
   log "Removing .venv (--fresh)"
   rm -rf "${VENV_DIR}"
@@ -99,6 +112,10 @@ elif [[ -e "${VENV_DIR}" ]] && ! venv_is_macos; then
   if [[ -d "${VENV_DIR}/Scripts" ]]; then
     warn "Detected Windows-style .venv/Scripts — recreating for macOS."
   fi
+  rm -rf "${VENV_DIR}"
+elif venv_is_macos && ! venv_has_pip; then
+  log "Existing .venv is incomplete (no pip) — removing and recreating"
+  warn "Usually caused by interrupting venv creation (Ctrl+C during ensurepip)."
   rm -rf "${VENV_DIR}"
 elif venv_is_macos; then
   log "Keeping existing macOS .venv"

@@ -13,8 +13,6 @@ csv_output/*
 !csv_output/.gitkeep
 pnr_output/*
 !pnr_output/.gitkeep
-booking_api_output/*
-!booking_api_output/.gitkeep
 ocr_csv_output/*
 !ocr_csv_output/.gitkeep
 backups/

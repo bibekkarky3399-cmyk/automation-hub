@@ -85,11 +85,6 @@ from launcher.user_notifications import (
     list_user_notifications,
 )
 from launcher.version import APP_VERSION
-from launcher.booking_client import (
-    BookingClientError,
-    fetch_sectors,
-    search_availability,
-)
 from launcher.validators import (
     coerce_bool,
     ensure_uploads_dir,
@@ -141,9 +136,6 @@ _PUBLIC_ENDPOINTS = frozenset(
         "logout",
         "api_health",
         "static",
-        "flights_page",
-        "api_flights_sectors",
-        "api_flights_search",
     }
 )
 
@@ -305,52 +297,6 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
-
-
-@app.route("/flights")
-def flights_page():
-    """Public agency-style live flight search (no login)."""
-    return render_template("flights.html", app_version=APP_VERSION)
-
-
-@app.get("/api/flights/sectors")
-def api_flights_sectors():
-    try:
-        sectors = fetch_sectors(force=bool(request.args.get("refresh")))
-        return jsonify({"ok": True, "sectors": sectors, "count": len(sectors)})
-    except BookingClientError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except Exception as exc:
-        msg = str(exc)
-        if "escape" in msg.lower() or "scripts.json" in msg.lower():
-            msg = (
-                f"{msg} — fix config/scripts.json python path to "
-                '".venv/Scripts/python.exe" (forward slashes), then restart Helix.'
-            )
-        return jsonify({"ok": False, "error": f"Could not load cities: {msg}"}), 500
-
-
-@app.post("/api/flights/search")
-def api_flights_search():
-    payload = request.get_json(silent=True) or {}
-    try:
-        result = search_availability(
-            sector_from=str(payload.get("from") or payload.get("sector_from") or ""),
-            sector_to=str(payload.get("to") or payload.get("sector_to") or ""),
-            flight_date=str(payload.get("date") or payload.get("flight_date") or ""),
-            trip_type=str(payload.get("trip_type") or "O"),
-            return_date=str(payload.get("return_date") or ""),
-            nationality=str(payload.get("nationality") or "NP"),
-            adults=int(payload.get("adults") or 1),
-            children=int(payload.get("children") or 0),
-        )
-        return jsonify({"ok": True, **result})
-    except BookingClientError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except (TypeError, ValueError) as exc:
-        return jsonify({"ok": False, "error": f"Invalid search: {exc}"}), 400
-    except Exception as exc:
-        return jsonify({"ok": False, "error": f"Search failed: {exc}"}), 500
 
 
 @app.route("/")

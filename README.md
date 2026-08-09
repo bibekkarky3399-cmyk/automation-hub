@@ -1,6 +1,6 @@
 # Helix
 
-Local ops launcher for airline workflows: OCR → CSV, Yeti B2B PNR booking, and United Solutions Booking API → CSV. Config lives in `config/scripts.json`; jobs run on this machine through a small Flask UI.
+Local ops launcher for airline workflows: OCR → CSV, Yeti B2B PNR booking, and TBO Series Fare upload. Config lives in `config/scripts.json`; jobs run on this machine through a small Flask UI.
 
 ## What you get
 
@@ -188,7 +188,7 @@ config/scripts.json    # Workflow definitions
 launcher/              # Jobs, auth, history, pipelines
 scripts/ocr/           # OCR → CSV
 scripts/pnr/           # Yeti B2B PNR (Playwright)
-scripts/booking_api/   # Booking API → CSV
+scripts/series_fare/   # TBO Series Fare API upload
 templates/ static/     # UI
 data/                  # Run history / metrics
 outputs/               # All run CSVs (UUID filenames; set via scripts.json output_dir)
